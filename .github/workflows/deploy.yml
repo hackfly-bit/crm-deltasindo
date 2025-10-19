@@ -1,4 +1,4 @@
-name: Deploy Laravel to cPanel via FTP
+name: Deploy Laravel to cPanel via FTP (updated)
 
 on:
   push:
@@ -7,94 +7,97 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.1'
-        extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, mysql, gd, zip
-        coverage: none
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, mysql, gd, zip
+          coverage: none
 
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v3
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: composer install --prefer-dist --no-progress --no-suggest --no-dev --optimize-autoloader
+      - name: Check Node and npm version
+        run: |
+          node -v
+          npm -v
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest --no-interaction --no-dev --optimize-autoloader
 
-    - name: Install NPM dependencies
-      run: npm ci
+      - name: Install NPM dependencies
+        run: npm ci
 
-    - name: Build assets
-      run: npm run production
+      - name: Build assets
+        run: npm run production
 
-    - name: Create deployment artifact
-      env:
-        GITHUB_SHA: ${{ github.sha }}
-      run: tar -czf "${GITHUB_SHA}".tar.gz --exclude=*.git --exclude=node_modules --exclude=tests .
+      - name: Laravel optimizations
+        run: |
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          php artisan event:cache
 
-    - name: Store artifact for distribution
-      uses: actions/upload-artifact@v3
-      with:
-        name: app-build
-        path: ${{ github.sha }}.tar.gz
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # passive: true
+          # git-ftp-args: --insecure
+          exclude: |
+            **/.git*
+            **/node_modules/**
+            **/tests/**
+            **/.env*
+            **/README.md
+            **/.gitignore
+            **/.gitattributes
+            **/phpunit.xml
+            **/webpack.mix.js
+            **/package*.json
+            **/.editorconfig
+            **/.styleci.yml
+            **/sail
+            **/docker-compose.yml
+            **/.dockerignore
 
-    - name: Deploy to cPanel via FTP
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        server-dir: ${{ secrets.FTP_SERVER_DIR }}
-        exclude: |
-          **/.git*
-          **/.git*/**
-          **/node_modules/**
-          **/tests/**
-          **/.env.example
-          **/README.md
-          **/.gitignore
-          **/.gitattributes
-          **/phpunit.xml
-          **/webpack.mix.js
-          **/package*.json
-          **/.editorconfig
-          **/.styleci.yml
-          **/sail
-          **/docker-compose.yml
-          **/.dockerignore
-
-    # - name: Run post-deployment commands
-    #   uses: appleboy/ssh-action@v1.0.0
-    #   with:
-    #     host: ${{ secrets.SSH_HOST }}
-    #     username: ${{ secrets.SSH_USERNAME }}
-    #     password: ${{ secrets.SSH_PASSWORD }}
-    #     port: ${{ secrets.SSH_PORT }}
-    #     script: |
-    #       cd ${{ secrets.REMOTE_PATH }}
-    #       php artisan config:cache
-    #       php artisan route:cache
-    #       php artisan view:cache
-    #       php artisan migrate --force
-    #       php artisan storage:link
-    #       chmod -R 755 storage
-    #       chmod -R 755 bootstrap/cache
+      # - name: Run post-deployment commands on remote (if SSH configured)
+      #   if: ${{ secrets.SSH_HOST != '' && secrets.SSH_USERNAME != '' }}
+      #   uses: appleboy/ssh-action@v1.0.0
+      #   with:
+      #     host: ${{ secrets.SSH_HOST }}
+      #     username: ${{ secrets.SSH_USERNAME }}
+      #     password: ${{ secrets.SSH_PASSWORD }}
+      #     port: ${{ secrets.SSH_PORT || '22' }}
+      #     script: |
+      #       set -e
+      #       cd "${{ secrets.REMOTE_PATH }}"
+      #       # ensure proper permissions and caches
+      #       php artisan config:cache || true
+      #       php artisan route:cache || true
+      #       php artisan view:cache || true
+      #       php artisan migrate --force || true
+      #       php artisan storage:link || true
+      #       chmod -R 755 storage || true
+      #       chmod -R 755 bootstrap/cache || true
