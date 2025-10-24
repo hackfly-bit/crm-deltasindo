@@ -1,5 +1,9 @@
 @extends('layout.master')
 
+@push('plugin-styles')
+    <link href="{{ asset('assets/plugins/flatpickr/flatpickr.min.css') }}" rel="stylesheet" />
+@endpush
+
 @section('content')
     <div class="row">
         <div class="col-12 grid-margin">
@@ -7,6 +11,34 @@
                 <div class="position-relative">
                     <div class="row p-5">
                         <h4 class="mb-3 mb-md-0">Dashboard User</h4>
+                        <div class="d-flex align-items-center mt-2 mt-md-0">
+                            <form method="GET" action="{{ route('user.profile', $user->id) }}">
+                                <div class="row align-items-center g-3">
+                                    <div class="col-auto">
+                                        <label class="visually-hidden" for="start_date">Start Date</label>
+                                        <div class="input-group flatpickr" id="profile-start-date">
+                                            <input type="text" name="start_date" class="form-control" id="start_date"
+                                                placeholder="Start Date" data-input
+                                                value="{{ isset($filter_start) ? $filter_start->format('Y-m-d') : '' }}">
+                                            <span class="input-group-text input-group-addon" data-toggle><i
+                                                    data-feather="calendar"></i></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <label class="visually-hidden" for="end_date">End Date</label>
+                                        <div class="input-group flatpickr" id="profile-end-date">
+                                            <input type="text" name="end_date" class="form-control" id="end_date" placeholder="End Date"
+                                                data-input value="{{ isset($filter_end) ? $filter_end->format('Y-m-d') : '' }}">
+                                            <span class="input-group-text input-group-addon" data-toggle><i
+                                                    data-feather="calendar"></i></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="submit" class="btn btn-primary">Filter</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                         <div class="col-6 p-2">
                             <h5 class="mb-3 mb-md-0 text-center p-3">Brand Chart</h5>
                             <div id="brand"></div>
@@ -267,110 +299,130 @@
 @endsection
 
 @push('plugin-scripts')
+    <script src="{{ asset('assets/plugins/flatpickr/flatpickr.min.js') }}"></script>
     <script src="{{ asset('assets/plugins/apexcharts/apexcharts.min.js') }}"></script>
+@endpush
+
+@push('custom-scripts')
+    <script>
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr("#profile-start-date", {
+                wrap: true,
+                dateFormat: "Y-m-d",
+                altInput: true,
+                altFormat: "d M Y"
+            });
+            flatpickr("#profile-end-date", {
+                wrap: true,
+                dateFormat: "Y-m-d",
+                altInput: true,
+                altFormat: "d M Y"
+            });
+        }
+    </script>
 @endpush
 
 @push('user-chart')
     <script>
-        var brand = {
-            chart: {
-                height: 400,
-                width: '100%',
-                type: 'bar',
+        const brandSeriesData = @json($brand_series ?? []);
+        const productSeriesData = @json($product_series ?? []);
 
-            },
-            plotOptions: {
-                bar: {
-                    distributed: true,
-                    columnWidth: '60%'
-                }
-            },
-            legend: {
-                show: false
-            },
-            series: [{
-                data: [
-                    @foreach ($data_brand as $x)
-
-
-                        {
-                            x: {!! \DB::table('principal')->where('id', $x->brand)->get()->pluck('name') !!},
-                            y: {{ $x->value }}
-                        },
-                    @endforeach
-
-                ]
-            }]
-
-        }
-
-        var product = {
-            chart: {
-                height: 400,
-                width: '100%',
-                type: 'bar',
-
-            },
-            plotOptions: {
-                bar: {
-                    distributed: true,
-                    columnWidth: '60%'
-                }
-            },
-            legend: {
-                show: false
-            },
-            series: [{
-                data: [
-                    @foreach ($data_produk as $key => $value)
-                        {
-                            x: "{{ $key }}",
-                            y: {{ $value }},
-
-                        },
-                    @endforeach
-                ]
-            }]
-
-        }
-
-        var sales_target = {
-            chart: {
-                height: 350,
-                type: 'radialBar',
-            },
-            series: [{{ ($user->sph->sum('nilai_pagu') / 5000000000) * 100 }}],
-            labels: ['Rp. {{ number_format($user->sph->sum('nilai_pagu')) }}'],
-        }
-
-        var total_data = {
-            series: [{
-                data: [{{ $data_customer }}, {{ $data_call }}, {{ $data_visit }},
-                    {{ $data_presentasi }}, {{ $data_sph }}, {{ $data_po }},
-                    {{ $data_other }}
-                ]
-            }],
-            chart: {
-                type: 'bar',
-                height: 350
-            },
-            plotOptions: {
-                bar: {
-                    borderRadius: 4,
-                    horizontal: true,
-                }
-            },
-            dataLabels: {
-                enabled: true
-            },
-            xaxis: {
-                categories: ['Customer', 'Call', 'Visit', 'Presentasi', 'Qoutation', 'PO', 'Other'],
-            }
+        const brand = {
+            chart: { height: 400, width: '100%', type: 'bar' },
+            plotOptions: { bar: { distributed: true, columnWidth: '60%' } },
+            legend: { show: false },
+            series: [{ data: brandSeriesData }]
         };
 
-        new ApexCharts(document.querySelector("#total_data"), total_data).render();
-        new ApexCharts(document.querySelector("#sales_target"), sales_target).render();
-        new ApexCharts(document.querySelector("#brand"), brand).render();
-        new ApexCharts(document.querySelector("#product"), product).render();
+        const product = {
+            chart: { height: 400, width: '100%', type: 'bar' },
+            plotOptions: { bar: { distributed: true, columnWidth: '60%' } },
+            legend: { show: false },
+            series: [{ data: productSeriesData }]
+        };
+
+        const sales_target = {
+            chart: { height: 350, type: 'radialBar' },
+            series: [{{ ($sales_target / 5000000000) * 100 }}],
+            labels: ['Rp. {{ number_format($sales_target) }}'],
+        };
+
+        const total_data = {
+            series: [{
+                data: [{{ $data_customer }}, {{ $data_call }}, {{ $data_visit }},
+                    {{ $data_presentasi }}, {{ $data_sph }}, {{ $data_po }}, {{ $data_other }}
+                ]
+            }],
+            chart: { type: 'bar', height: 350 },
+            plotOptions: { bar: { borderRadius: 4, horizontal: true } },
+            dataLabels: { enabled: true },
+            xaxis: { categories: ['Customer', 'Call', 'Visit', 'Presentasi', 'Qoutation', 'PO', 'Other'] }
+        };
+
+        new ApexCharts(document.querySelector('#total_data'), total_data).render();
+        new ApexCharts(document.querySelector('#sales_target'), sales_target).render();
+        new ApexCharts(document.querySelector('#brand'), brand).render();
+        new ApexCharts(document.querySelector('#product'), product).render();
     </script>
+@endpush
+
+{{-- Filter Form (already added earlier)
+{{-- Brand & Produk Chart section refactor lines 325-428 --}}
+{{-- Replace inline DB calls/data assembly with controller-provided series --}}
+{{-- <div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Brand by Sales</h5>
+                <small class="text-muted">Periode: {{ optional($filter_start)->format('d M Y') }} - {{ optional($filter_end)->format('d M Y') }}</small>
+            </div>
+            <div class="card-body">
+                <div id="chartBrand"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Produk by Sales</h5>
+                <small class="text-muted">Periode: {{ optional($filter_start)->format('d M Y') }} - {{ optional($filter_end)->format('d M Y') }}</small>
+            </div>
+            <div class="card-body">
+                <div id="chartProduk"></div>
+            </div>
+        </div>
+    </div>
+</div> --}}
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const brandSeriesData = @json($brand_series ?? []);
+        const productSeriesData = @json($product_series ?? []);
+
+        // Brand chart
+        if (document.querySelector('#chartBrand')) {
+            const brandChart = new ApexCharts(document.querySelector('#chartBrand'), {
+                chart: { type: 'bar', height: 300 },
+                series: [{ name: 'Brand', data: brandSeriesData }],
+                xaxis: { type: 'category' },
+                dataLabels: { enabled: false },
+                tooltip: { y: { formatter: (val) => `${val}` } }
+            });
+            brandChart.render();
+        }
+
+        // Produk chart
+        if (document.querySelector('#chartProduk')) {
+            const produkChart = new ApexCharts(document.querySelector('#chartProduk'), {
+                chart: { type: 'bar', height: 300 },
+                series: [{ name: 'Produk', data: productSeriesData }],
+                xaxis: { type: 'category' },
+                dataLabels: { enabled: false },
+                tooltip: { y: { formatter: (val) => `${val}` } }
+            });
+            produkChart.render();
+        }
+    });
+</script>
 @endpush
