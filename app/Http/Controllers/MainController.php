@@ -144,7 +144,8 @@ class MainController extends Controller
 
         // Precompute KPI metrics for users to avoid N+1 queries in Blade
         $kpi = Cache::remember('dashboard.kpi_metrics.' . $dateKey, 300, function () use ($e, $start, $end) {
-            return $this->buildKpiMetrics($e, $start, $end);
+            $ids = collect($e)->pluck('id')->all();
+            return User::kpiCountsByDateRange($ids, $start, $end);
         });
 
         $filter_start = $start;

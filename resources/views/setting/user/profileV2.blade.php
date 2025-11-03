@@ -2,9 +2,38 @@
 
 @push('plugin-styles')
     <link href="{{ asset('assets/plugins/flatpickr/flatpickr.min.css') }}" rel="stylesheet" />
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 @endpush
 
 @section('content')
+    {{-- Display validation errors --}}
+    @if ($errors->any())
+        <div class="row">
+            <div class="col-12">
+                @foreach ($errors->all() as $error)
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i data-feather="alert-circle"></i>
+                        <strong>Error!</strong> {{ $error }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="btn-close"></button>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    {{-- Display success message --}}
+    @if (session('success'))
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i data-feather="check-circle"></i>
+                    <strong>Berhasil!</strong> {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="btn-close"></button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="row">
         <div class="col-12 grid-margin">
             <div class="card">
@@ -466,13 +495,13 @@
         document.getElementById('weekFilter').addEventListener('change', function() {
             const selectedWeek = this.value;
             const currentUrl = new URL(window.location.href);
-            
+
             if (selectedWeek) {
                 currentUrl.searchParams.set('week', selectedWeek);
             } else {
                 currentUrl.searchParams.delete('week');
             }
-            
+
             window.location.href = currentUrl.toString();
         });
 
@@ -480,7 +509,7 @@
         document.getElementById('monthFilter').addEventListener('change', function() {
             const selectedMonth = this.value;
             const currentUrl = new URL(window.location.href);
-            
+
             if (selectedMonth) {
                 currentUrl.searchParams.set('month', selectedMonth);
                 // Preserve year from master filter if exists
@@ -493,7 +522,7 @@
                 currentUrl.searchParams.delete('month');
                 currentUrl.searchParams.delete('year');
             }
-            
+
             window.location.href = currentUrl.toString();
         });
 

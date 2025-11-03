@@ -74,7 +74,12 @@ class UserController extends Controller
     public function updateUser(Request $request, $id)
     {
         $request->validate([
-
+            'username' => 'required',
+            'firstname' => 'required',
+            'lastname' => 'required',
+            'email' => 'required|email|unique:users,email,' . $id,
+            'role' => 'required',
+            'password' => 'nullable|min:6',
         ]);
 
         $user = User::find($id);
@@ -82,7 +87,9 @@ class UserController extends Controller
         $user->firstname = $request->firstname;
         $user->lastname = $request->lastname;
         $user->email = $request->email;
-        $user->password = Hash::make($request->password);
+        if($request->filled('password')){
+            $user->password = Hash::make($request->password);
+        }
         $user->address = $request->address;
         $user->city = $request->city;
         $user->country  = "Indonesia";
@@ -91,8 +98,7 @@ class UserController extends Controller
         $user->syncRoles($request->role);
 
         $user->save();
-
-        return redirect()->route('setting.user')->with('success', 'User Berhasil Di Update !!');
+        return back()->with('success', 'User Berhasil Di Update !!');
     }
 
     public function deleteUser($id)
@@ -130,11 +136,15 @@ class UserController extends Controller
     public function profile(Request $request, $id)
     {
         $user =  User::find($id);
+        $roles = Role::all();
 
         // Validate optional date inputs (Y-m-d) like dashboard
         $validator = Validator::make($request->all(), [
             'start_date' => 'nullable|date_format:Y-m-d',
             'end_date' => 'nullable|date_format:Y-m-d',
+            'week' => 'nullable|integer|min:1|max:52',
+            'month' => 'nullable|integer|min:1|max:12',
+            'year' => 'nullable|integer|min:2020|max:2030',
         ]);
 
         if (!$validator->fails() && $request->filled('start_date') && $request->filled('end_date')) {
@@ -148,6 +158,24 @@ class UserController extends Controller
         } else {
             $start = Carbon::now()->startOfYear();
             $end = Carbon::now()->endOfYear();
+        }
+
+        // Handle week filter for KPI Weekly
+        $weekStart = $start;
+        $weekEnd = $end;
+        if ($request->filled('week')) {
+            $year = $request->filled('year') ? $request->input('year') : Carbon::now()->year;
+            $weekStart = Carbon::now()->setISODate($year, $request->input('week'))->startOfWeek();
+            $weekEnd = Carbon::now()->setISODate($year, $request->input('week'))->endOfWeek();
+        }
+
+        // Handle month filter for KPI Monthly
+        $monthStart = $start;
+        $monthEnd = $end;
+        if ($request->filled('month')) {
+            $year = $request->filled('year') ? $request->input('year') : Carbon::now()->year;
+            $monthStart = Carbon::create($year, $request->input('month'), 1)->startOfMonth();
+            $monthEnd = Carbon::create($year, $request->input('month'), 1)->endOfMonth();
         }
 
         if ($start->gt($end)) {
@@ -215,10 +243,23 @@ class UserController extends Controller
         // Sales target filtered by date range
         $sales_target = $user->sph()->whereBetween('created_at', [$start, $end])->sum('nilai_pagu');
 
+        // KPI terstruktur: hitung berdasarkan filter yang dipilih
+        if ($request->filled('week')) {
+            $kpi_weekly = $user->kpiCountsByRange($id, $weekStart, $weekEnd);
+        } else {
+            $kpi_weekly = $user->kpiPeriodCounts('weekly');
+        }
+
+        if ($request->filled('month')) {
+            $kpi_monthly = $user->kpiCountsByRange($id, $monthStart, $monthEnd);
+        } else {
+            $kpi_monthly = $user->kpiPeriodCounts('monthly');
+        }
+
         $filter_start = $start;
         $filter_end = $end;
 
-        return view('setting.user.profile', compact('user','customer_by_sales', 'data_customer','data_call','data_visit', 'data_other', 'data_presentasi','data_sph','data_po','brand_series','product_series','data_produk','filter_start','filter_end','sales_target'));
+        return view('setting.user.profile', compact('user','roles','customer_by_sales', 'data_customer','data_call','data_visit', 'data_other', 'data_presentasi','data_sph','data_po','brand_series','product_series','data_produk','filter_start','filter_end','sales_target','kpi_weekly','kpi_monthly'));
     }
 
     public function logout(Request $request)

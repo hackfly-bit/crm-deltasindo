@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Facades\Log;
 
 class User extends Authenticatable
 {
@@ -71,16 +72,24 @@ class User extends Authenticatable
         $now = Carbon::now();
 
         if ($periodType === 'weekly') {
-            $startDate = $now->copy()->startOfWeek()->toDateString();
-            $endDate = $periodType === 'weekly' ? $now->copy()->endOfWeek()->toDateString() : $now;
+            $startDate = $now->copy()->startOfWeek();
+            $endDate = $now->copy()->endOfWeek();
         } else {
             $startDate = $now->copy()->startOfMonth();
             $endDate = $now;
         }
 
-        return $modelClass::where('user_id', $userId)
+        // Debug log
+        Log::info("KPI Debug - Model: {$modelClass}, User: {$userId}, Period: {$periodType}");
+        Log::info("Date range: {$startDate} to {$endDate}");
+
+        $count = $modelClass::where('user_id', $userId)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->count();
+
+        Log::info("Count result: {$count}");
+
+        return $count;
     }
 
     /**
@@ -214,6 +223,87 @@ class User extends Authenticatable
         }
 
         return $totalPercentage;
+    }
+
+    /**
+     * Mengambil seluruh KPI (customer, call, visit, presentasi, sph, preorder)
+     * untuk user ini berdasarkan jenis periode ('weekly' atau 'monthly').
+     */
+    public function kpiPeriodCounts(string $periodType = 'weekly'): array
+    {
+        $map = [
+            'new_customer' => Customer::class,
+            'call' => Call::class,
+            'visit' => Kegiatan_visit::class,
+            'presentasi' => Presentasi::class,
+            'sph' => Sph::class,
+            'preorder' => Preorder::class,
+        ];
+
+        $counts = [];
+        foreach ($map as $key => $model) {
+            $counts[$key] = $this->countByPeriod($model, $this->id, $periodType);
+        }
+        return $counts;
+    }
+
+    /**
+     * Mengambil KPI untuk satu user berdasarkan rentang tanggal.
+     */
+    public function kpiCountsByRange(int $userId, $start, $end): array
+    {
+        return [
+            'new_customer' => Customer::where('user_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+            'call' => Call::where('user_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+            'visit' => Kegiatan_visit::where('user_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+            'presentasi' => Presentasi::where('user_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+            'sph' => Sph::where('user_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+            'preorder' => Preorder::where('user_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+        ];
+    }
+
+    /**
+     * Mengambil KPI terstruktur untuk banyak user sekaligus (untuk dashboard),
+     * mengembalikan array [user_id => metrics].
+     */
+    public static function kpiCountsByDateRange(array $userIds, $start, $end): array
+    {
+        $ids = collect($userIds)->filter()->values()->all();
+        if (empty($ids)) {
+            return [];
+        }
+
+        $groupCount = function (string $table) use ($start, $end, $ids) {
+            return \Illuminate\Support\Facades\DB::table($table)
+                ->select('user_id')
+                ->selectRaw('COUNT(*) as total')
+                ->whereIn('user_id', $ids)
+                ->whereBetween('created_at', [$start, $end])
+                ->groupBy('user_id')
+                ->pluck('total', 'user_id')
+                ->all();
+        };
+
+        $customers = $groupCount('customers');
+        $calls = $groupCount('calls');
+        $visits = $groupCount('kegiatan_visits');
+        $presentasi = $groupCount('presentasis');
+        $sph = $groupCount('sphs');
+        $preorders = $groupCount('preorders');
+
+        $metrics = [];
+        foreach ($ids as $id) {
+            $metrics[$id] = [
+                'new_customer_period' => $customers[$id] ?? 0,
+                'call_period' => $calls[$id] ?? 0,
+                'visit_period' => $visits[$id] ?? 0,
+                'presentasi_period' => $presentasi[$id] ?? 0,
+                'sph_period' => $sph[$id] ?? 0,
+                'preorder_period' => $preorders[$id] ?? 0,
+            ];
+        }
+
+        return $metrics;
     }
 
 }
