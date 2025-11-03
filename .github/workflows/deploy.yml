@@ -66,8 +66,9 @@ jobs:
           # passive: true
           # git-ftp-args: --insecure
           exclude: |
-            **/.git*
-            **/.github/
+            **/.git/**
+            **/.github/**
+            **/vendor/**
             **/node_modules/**
             **/tests/**
             **/.env*
