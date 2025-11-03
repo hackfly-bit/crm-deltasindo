@@ -32,6 +32,8 @@ Route::middleware(['web'])->prefix('profile')->group(function () {
     Route::get('/{id}/brand-chart', [ProfileApiController::class, 'getBrandChart'])->name('api.profile.brand-chart');
     Route::get('/{id}/product-chart', [ProfileApiController::class, 'getProductChart'])->name('api.profile.product-chart');
     Route::get('/{id}/total-data', [ProfileApiController::class, 'getTotalDataOnly'])->name('api.profile.total-data');
+    Route::get('/{id}/sales-target', [ProfileApiController::class, 'getSalesTarget'])->name('api.profile.sales-target');
+    Route::get('/{id}/user', [ProfileApiController::class, 'getUserProfile'])->name('api.profile.user');
 });
 
 Route::get('/data-user', function(){

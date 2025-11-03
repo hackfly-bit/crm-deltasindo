@@ -23,7 +23,17 @@ class User extends Authenticatable
      * @var array
      */
     protected $fillable = [
-        'name', 'email', 'password',
+        'username',
+        'firstname',
+        'lastname',
+        'email',
+        'password',
+        'role',
+        'address',
+        'city',
+        'country',
+        'postal',
+        'about',
     ];
 
     /**
@@ -42,6 +52,11 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+    ];
+
+    protected $appends = [
+        'full_name',
+        'join_date',
     ];
 
     public function role()
@@ -304,6 +319,20 @@ class User extends Authenticatable
         }
 
         return $metrics;
+    }
+
+    // Accessors
+    public function getFullNameAttribute(): string
+    {
+        $first = $this->firstname ?? '';
+        $last = $this->lastname ?? '';
+        $name = trim($first . ' ' . $last);
+        return $name !== '' ? $name : ($this->username ?? '');
+    }
+
+    public function getJoinDateAttribute(): ?string
+    {
+        return optional($this->created_at)->format('Y-m-d');
     }
 
 }

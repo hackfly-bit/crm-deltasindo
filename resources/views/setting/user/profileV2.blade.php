@@ -205,100 +205,129 @@
         <!-- middle wrapper start -->
         <div class="col-md-8 col-xl-6 middle-wrapper">
             <div class="row">
-                <div class="col-md-12 grid-margin">
+                <div class="col-md-12 grid-margin" x-data="kpiWeeklyComponent()">
                     <div class="card rounded">
                         <div class="card-header">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div class="d-flex align-items-center">
                                     <div class="ms-2">
                                         <p>KPI Weekly</p>
-                                        <p class="tx-11 text-muted"></p>
+                                        <p class="tx-11 text-muted" x-show="dateRange" x-text="dateRange"></p>
                                     </div>
                                 </div>
                                 <div class="dropdown">
-                                    <select class="form-select form-select-sm" id="weekFilter" style="width: 120px;">
+                                    <select class="form-select form-select-sm"
+                                            x-model="selectedWeek"
+                                            @change="fetchKpiData()"
+                                            style="width: 120px;"
+                                            :disabled="loading">
                                         <option value="">Pilih Minggu</option>
-                                        @for($i = 1; $i <= 52; $i++)
-                                            <option value="{{ $i }}" {{ request('week') == $i ? 'selected' : '' }}>
-                                                Minggu {{ $i }}
-                                            </option>
-                                        @endfor
+                                        <template x-for="i in 52" :key="i">
+                                            <option :value="i" x-text="`Minggu ${i}`"></option>
+                                        </template>
                                     </select>
                                 </div>
                             </div>
                         </div>
                         <div class="card-body">
-                            <ul class="list-group">
+                            <!-- Loading indicator -->
+                            <div x-show="loading" class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span class="ms-2">Memuat data...</span>
+                            </div>
+
+                            <!-- KPI Data -->
+                            <ul class="list-group" x-show="!loading">
                                 <li class="list-group-item">New Customer
                                     <div class="progress">
-                                        <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['new_customer'] / 2) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['new_customer'] / 2) * 100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['new_customer'] / 2) * 100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped"
+                                             role="progressbar"
+                                             :style="`width: ${Math.min((kpiData.new_customer / 2) * 100, 100)}%;`"
+                                             :aria-valuenow="Math.min((kpiData.new_customer / 2) * 100, 100)"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"
+                                             x-text="`${Math.min((kpiData.new_customer / 2) * 100, 100).toFixed(1)}% (${kpiData.new_customer}/2)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Promotion
                                     <div class="progress">
-                                        <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['call'] / 16) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['call'] / 16) * 100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['call'] / 16) * 100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped"
+                                             role="progressbar"
+                                             :style="`width: ${Math.min((kpiData.call / 16) * 100, 100)}%;`"
+                                             :aria-valuenow="Math.min((kpiData.call / 16) * 100, 100)"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"
+                                             x-text="`${Math.min((kpiData.call / 16) * 100, 100).toFixed(1)}% (${kpiData.call}/16)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Visit
                                     <div class="progress">
-                                        <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['visit'] / 4) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['visit'] / 4) * 100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['visit'] / 4) * 100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped"
+                                             role="progressbar"
+                                             :style="`width: ${Math.min((kpiData.visit / 4) * 100, 100)}%;`"
+                                             :aria-valuenow="Math.min((kpiData.visit / 4) * 100, 100)"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"
+                                             x-text="`${Math.min((kpiData.visit / 4) * 100, 100).toFixed(1)}% (${kpiData.visit}/4)`">
+                                        </div>
                                     </div>
-
                                 </li>
                                 <li class="list-group-item">Qoutation
                                     <div class="progress">
-                                        <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['sph'] / 2) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['sph'] / 2) * 100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['sph'] / 2) * 100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped"
+                                             role="progressbar"
+                                             :style="`width: ${Math.min((kpiData.sph / 2) * 100, 100)}%;`"
+                                             :aria-valuenow="Math.min((kpiData.sph / 2) * 100, 100)"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"
+                                             x-text="`${Math.min((kpiData.sph / 2) * 100, 100).toFixed(1)}% (${kpiData.sph}/2)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Purchase Order
                                     <div class="progress">
-                                        <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['preorder'] / 1) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['preorder'] / 1) * 100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['preorder'] / 1) * 100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped"
+                                             role="progressbar"
+                                             :style="`width: ${Math.min((kpiData.preorder / 1) * 100, 100)}%;`"
+                                             :aria-valuenow="Math.min((kpiData.preorder / 1) * 100, 100)"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"
+                                             x-text="`${Math.min((kpiData.preorder / 1) * 100, 100).toFixed(1)}% (${kpiData.preorder}/1)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Presentasi
                                     <div class="progress">
-                                        <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['presentasi'] / 2) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['presentasi'] / 2) * 100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['presentasi'] / 2) * 100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped"
+                                             role="progressbar"
+                                             :style="`width: ${Math.min((kpiData.presentasi / 2) * 100, 100)}%;`"
+                                             :aria-valuenow="Math.min((kpiData.presentasi / 2) * 100, 100)"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"
+                                             x-text="`${Math.min((kpiData.presentasi / 2) * 100, 100).toFixed(1)}% (${kpiData.presentasi}/2)`">
+                                        </div>
                                     </div>
                                 </li>
                             </ul>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-12">
+                <div class="col-md-12" x-data="kpiMonthlyComponent()">
                     <div class="card rounded">
                         <div class="card-header">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div class="d-flex align-items-center">
                                     <div class="ms-2">
                                         <p>KPI Monthly</p>
+                                        <small class="text-muted" x-show="dateRange" x-text="dateRange"></small>
                                     </div>
                                 </div>
                                 <div class="dropdown">
-                                    <select class="form-select form-select-sm" id="monthFilter" style="width: 120px;">
+                                    <select class="form-select form-select-sm" x-model="selectedMonth" @change="fetchKpiData()" style="width: 120px;">
                                         <option value="">Pilih Bulan</option>
                                         @php
                                             $months = [
@@ -317,59 +346,73 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <ul class="list-group">
+                            <!-- Loading indicator -->
+                            <div x-show="loading" class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Memuat data...</span>
+                                </div>
+                                <small class="d-block mt-2 text-muted">Memuat data...</small>
+                            </div>
+
+                            <ul class="list-group" x-show="!loading">
                                 <li class="list-group-item">New Customer
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['new_customer']/8)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['new_customer']/8)*100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['new_customer']/8)*100 }}%</div>
+                                            :style="{ width: Math.min((kpiData.new_customer / 8) * 100, 100) + '%' }"
+                                            :aria-valuenow="Math.min((kpiData.new_customer / 8) * 100, 100)"
+                                            aria-valuemin="0" aria-valuemax="100"
+                                            x-text="`${Math.min((kpiData.new_customer / 8) * 100, 100).toFixed(1)}% (${kpiData.new_customer}/8)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Promotion
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['call']/60)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['call']/60)*100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['call']/60)*100 }}%</div>
+                                            :style="{ width: Math.min((kpiData.call / 60) * 100, 100) + '%' }"
+                                            :aria-valuenow="Math.min((kpiData.call / 60) * 100, 100)"
+                                            aria-valuemin="0" aria-valuemax="100"
+                                            x-text="`${Math.min((kpiData.call / 60) * 100, 100).toFixed(1)}% (${kpiData.call}/60)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Visit
                                     <div class="progress">
-                                    <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['visit']/16)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['visit']/16)*100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['visit']/16)*100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped" role="progressbar"
+                                            :style="{ width: Math.min((kpiData.visit / 16) * 100, 100) + '%' }"
+                                            :aria-valuenow="Math.min((kpiData.visit / 16) * 100, 100)"
+                                            aria-valuemin="0" aria-valuemax="100"
+                                            x-text="`${Math.min((kpiData.visit / 16) * 100, 100).toFixed(1)}% (${kpiData.visit}/16)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Qoutation
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['sph']/8)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['sph']/8)*100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['sph']/8)*100 }}%</div>
+                                            :style="{ width: Math.min((kpiData.sph / 8) * 100, 100) + '%' }"
+                                            :aria-valuenow="Math.min((kpiData.sph / 8) * 100, 100)"
+                                            aria-valuemin="0" aria-valuemax="100"
+                                            x-text="`${Math.min((kpiData.sph / 8) * 100, 100).toFixed(1)}% (${kpiData.sph}/8)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Purchase Order
                                     <div class="progress">
-                                    <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['preorder']/1)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['preorder']/1)*100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['preorder']/1)*100 }}%</div>
+                                        <div class="progress-bar progress-bar-striped" role="progressbar"
+                                            :style="{ width: Math.min((kpiData.preorder / 1) * 100, 100) + '%' }"
+                                            :aria-valuenow="Math.min((kpiData.preorder / 1) * 100, 100)"
+                                            aria-valuemin="0" aria-valuemax="100"
+                                            x-text="`${Math.min((kpiData.preorder / 1) * 100, 100).toFixed(1)}% (${kpiData.preorder}/1)`">
+                                        </div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Presentasi
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['presentasi']/2)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['presentasi']/2)*100 }}%"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['presentasi']/2)*100 }}%</div>
+                                            :style="{ width: Math.min((kpiData.presentasi / 2) * 100, 100) + '%' }"
+                                            :aria-valuenow="Math.min((kpiData.presentasi / 2) * 100, 100)"
+                                            aria-valuemin="0" aria-valuemax="100"
+                                            x-text="`${Math.min((kpiData.presentasi / 2) * 100, 100).toFixed(1)}% (${kpiData.presentasi}/2)`">
+                                        </div>
                                     </div>
                                 </li>
                             </ul>
@@ -423,6 +466,235 @@
 
 @push('custom-scripts')
     <script>
+        // Alpine.js component for KPI Weekly
+        function kpiMonthlyComponent() {
+            return {
+                selectedMonth: '{{ request("month") }}',
+                loading: false,
+                dateRange: '',
+                kpiData: {
+                    new_customer: 0,
+                    call: 0,
+                    visit: 0,
+                    sph: 0,
+                    preorder: 0,
+                    presentasi: 0
+                },
+
+                init() {
+                    // Set initial month if available
+                    if (this.selectedMonth) {
+                        this.updateDateRange();
+                        this.fetchKpiData();
+                    }
+                },
+
+                async fetchKpiData() {
+                    if (!this.selectedMonth) {
+                        this.kpiData = {
+                            new_customer: 0,
+                            call: 0,
+                            visit: 0,
+                            sph: 0,
+                            preorder: 0,
+                            presentasi: 0
+                        };
+                        this.dateRange = '';
+                        return;
+                    }
+
+                    this.loading = true;
+
+                    try {
+                        // Get start_date from input field
+                        const startDateInput = document.getElementById('start_date');
+                        const startDate = startDateInput ? startDateInput.value : '';
+
+                        const currentYear = new Date().getFullYear();
+                        const url = new URL(`/api/profile/{{ $user->id }}/kpi-monthly`, window.location.origin);
+
+                        // Add query parameters
+                        url.searchParams.append('month', this.selectedMonth);
+                        // url.searchParams.append('year', currentYear);
+                        if (startDate) {
+                            url.searchParams.append('start_date', startDate);
+                        }
+
+                        const response = await fetch(url);
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.kpiData = {
+                                new_customer: data.data.new_customer || 0,
+                                call: data.data.call || 0,
+                                visit: data.data.visit || 0,
+                                sph: data.data.sph || 0,
+                                preorder: data.data.preorder || 0,
+                                presentasi: data.data.presentasi || 0
+                            };
+                            // Use date_range from API response if available
+                            this.updateDateRange(data.date_range || null);
+                        } else {
+                            console.error('API Error:', data.message);
+                            // Reset to default values on error
+                            this.kpiData = {
+                                new_customer: 0,
+                                call: 0,
+                                visit: 0,
+                                sph: 0,
+                                preorder: 0,
+                                presentasi: 0
+                            };
+                        }
+                    } catch (error) {
+                        console.error('Fetch error:', error);
+                        // Reset to default values on error
+                        this.kpiData = {
+                            new_customer: 0,
+                            call: 0,
+                            visit: 0,
+                            sph: 0,
+                            preorder: 0,
+                            presentasi: 0
+                        };
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                updateDateRange(dateRange = null) {
+                    if (dateRange) {
+                        const startDate = new Date(dateRange.start).toLocaleDateString('id-ID');
+                        const endDate = new Date(dateRange.end).toLocaleDateString('id-ID');
+                        this.dateRange = `${startDate} - ${endDate}`;
+                    } else if (this.selectedMonth) {
+                        // Get year from start_date input or use current year as fallback
+                        const startDateInput = document.getElementById('start_date');
+                        let year = {{ date('Y') }}; // fallback to current year
+                        
+                        if (startDateInput && startDateInput.value) {
+                            const startDate = new Date(startDateInput.value);
+                            year = startDate.getFullYear();
+                        }
+                        
+                        // Calculate date range for selected month
+                        const firstDay = new Date(year, this.selectedMonth - 1, 1);
+                        const lastDay = new Date(year, this.selectedMonth, 0);
+                        
+                        this.dateRange = `${firstDay.toLocaleDateString('id-ID')} - ${lastDay.toLocaleDateString('id-ID')}`;
+                    }
+                }
+
+            }
+        }
+
+        function kpiWeeklyComponent() {
+            return {
+                selectedWeek: '{{ request("week") }}',
+                loading: false,
+                dateRange: '',
+                kpiData: {
+                    new_customer: {{ $kpi_weekly['new_customer'] ?? 0 }},
+                    call: {{ $kpi_weekly['call'] ?? 0 }},
+                    visit: {{ $kpi_weekly['visit'] ?? 0 }},
+                    sph: {{ $kpi_weekly['sph'] ?? 0 }},
+                    preorder: {{ $kpi_weekly['preorder'] ?? 0 }},
+                    presentasi: {{ $kpi_weekly['presentasi'] ?? 0 }}
+                },
+
+                init() {
+                    // Set initial date range if week is selected
+                    if (this.selectedWeek) {
+                        this.updateDateRange();
+                    }
+                },
+
+                async fetchKpiData() {
+                    if (!this.selectedWeek) {
+                        // Reset to initial data if no week selected
+                        this.kpiData = {
+                            new_customer: {{ $kpi_weekly['new_customer'] ?? 0 }},
+                            call: {{ $kpi_weekly['call'] ?? 0 }},
+                            visit: {{ $kpi_weekly['visit'] ?? 0 }},
+                            sph: {{ $kpi_weekly['sph'] ?? 0 }},
+                            preorder: {{ $kpi_weekly['preorder'] ?? 0 }},
+                            presentasi: {{ $kpi_weekly['presentasi'] ?? 0 }}
+                        };
+                        this.dateRange = '';
+                        return;
+                    }
+
+                    this.loading = true;
+
+                    try {
+                        // Get start_date from input field
+                        const startDateInput = document.getElementById('start_date');
+                        const startDate = startDateInput ? startDateInput.value : '';
+
+                        // Build API URL with parameters
+                        let apiUrl = `/api/profile/{{ $user->id }}/kpi-weekly?week=${this.selectedWeek}`;
+                        if (startDate) {
+                            apiUrl += `&start_date=${startDate}`;
+                        }
+
+                        const response = await fetch(apiUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            this.kpiData = result.data;
+                            this.updateDateRange(result.date_range);
+                        } else {
+                            console.error('API Error:', result.message);
+                            alert('Gagal memuat data KPI: ' + (result.message || 'Unknown error'));
+                        }
+                    } catch (error) {
+                        console.error('Fetch error:', error);
+                        alert('Terjadi kesalahan saat memuat data KPI. Silakan coba lagi.');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                updateDateRange(dateRange = null) {
+                    if (dateRange) {
+                        const startDate = new Date(dateRange.start).toLocaleDateString('id-ID');
+                        const endDate = new Date(dateRange.end).toLocaleDateString('id-ID');
+                        this.dateRange = `${startDate} - ${endDate}`;
+                    } else if (this.selectedWeek) {
+                        // Calculate date range for selected week
+                        const year = {{ date('Y') }};
+                        const startOfYear = new Date(year, 0, 1);
+                        const startOfWeek = new Date(startOfYear.getTime() + (this.selectedWeek - 1) * 7 * 24 * 60 * 60 * 1000);
+
+                        // Adjust to Monday
+                        const dayOfWeek = startOfWeek.getDay();
+                        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                        startOfWeek.setDate(startOfWeek.getDate() + mondayOffset);
+
+                        const endOfWeek = new Date(startOfWeek.getTime() + 6 * 24 * 60 * 60 * 1000);
+
+                        this.dateRange = `${startOfWeek.toLocaleDateString('id-ID')} - ${endOfWeek.toLocaleDateString('id-ID')}`;
+                    }
+                }
+            }
+        }
+
         if (typeof flatpickr !== 'undefined') {
             flatpickr("#profile-start-date", {
                 wrap: true,

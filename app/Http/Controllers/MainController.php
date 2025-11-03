@@ -61,7 +61,7 @@ class MainController extends Controller
         $b = Kegiatan_visit::whereBetween('created_at', [$start, $end])->count();
         $c = Kegiatan_other::whereBetween('created_at', [$start, $end])->count();
         $d = Sph::whereBetween('created_at', [$start, $end])->count();
-        $e = User::select('id','username','role')->whereIn('role', ['sales','supervisor'])->get();
+        $e = User::select('id', 'username', 'role')->whereIn('role', ['sales', 'supervisor'])->get();
         $f = Call::whereBetween('created_at', [$start, $end])->count();
         $g = Preorder::whereBetween('created_at', [$start, $end])->count();
         $h = Presentasi::whereBetween('created_at', [$start, $end])->count();
@@ -85,22 +85,22 @@ class MainController extends Controller
                 ->get();
         });
 
-        $data_brand = Cache::remember('dashboard.data_brand.' . $dateKey, 600, function () use ($start, $end) {
-            return SphProduct::query()
-                ->whereNotNull('brand_id')
-                ->whereBetween('created_at', [$start, $end])
-                ->selectRaw('brand_id as brand, COUNT(*) as value')
-                ->groupBy('brand_id')
-                ->orderBy('brand_id', 'asc')
-                ->get();
-        });
+        $data_brand =  SphProduct::query()
+            ->whereNotNull('brand_id')
+            ->whereHas('sph', function ($q) use ($start, $end) {
+                $q->whereBetween('created_at', [$start, $end]);
+            })
+            ->selectRaw('brand_id as brand, COUNT(*) as value')
+            ->groupBy('brand_id')
+            ->orderBy('brand_id', 'asc')
+            ->get();
 
 
         $chart_by_sales = Cache::remember('dashboard.chart_by_sales.' . $dateKey, 600, function () use ($start, $end) {
             return DB::table('users')
                 ->join('preorders', 'users.id', '=', 'preorders.user_id')
                 ->selectRaw('username, SUM(preorders.nominal) as total')
-                ->whereIn('role', ['sales','supervisor'])
+                ->whereIn('role', ['sales', 'supervisor'])
                 ->whereBetween('preorders.created_at', [$start, $end])
                 ->groupBy('username')
                 ->get();
@@ -119,7 +119,9 @@ class MainController extends Controller
         $produk_chart = Cache::remember('dashboard.produk_chart.' . $dateKey, 600, function () use ($start, $end) {
             $rows = SphProduct::query()
                 ->whereNotNull('product_id')
-                ->whereBetween('created_at', [$start, $end])
+                ->whereHas('sph', function ($q) use ($start, $end) {
+                    $q->whereBetween('created_at', [$start, $end]);
+                })
                 ->selectRaw('product_id, COUNT(*) as value')
                 ->groupBy('product_id')
                 ->get();
@@ -186,32 +188,36 @@ class MainController extends Controller
 
     // Function for display kpi from sales
 
-    public function view_customer(){
+    public function view_customer()
+    {
         $customer = Customer::all();
         $title = 'Total Customer';
 
-        return view('das-view.customer', compact('customer','title'));
+        return view('das-view.customer', compact('customer', 'title'));
     }
 
-    public function view_call(){
+    public function view_call()
+    {
         $call = Call::all();
         $title = 'Total Call';
 
-        return view('das-view.call', compact('call','title'));
+        return view('das-view.call', compact('call', 'title'));
     }
 
-    public function view_visit(){
+    public function view_visit()
+    {
         $visit = Kegiatan_visit::all();
         $title = 'Total Visit';
 
-        return view('das-view.visit', compact('visit','title'));
-        }
+        return view('das-view.visit', compact('visit', 'title'));
+    }
 
-    public function view_presentasi(){
+    public function view_presentasi()
+    {
         $presentasi = Presentasi::all();
         $title = 'Total Presentasi';
 
-        return view('das-view.presentasi', compact('presentasi','title'));
+        return view('das-view.presentasi', compact('presentasi', 'title'));
     }
 
     public function view_quotation()
@@ -219,7 +225,7 @@ class MainController extends Controller
         $sph = Sph::all();
         $title = 'Total Quotation';
 
-        return view('das-view.quotation', compact('sph','title'));
+        return view('das-view.quotation', compact('sph', 'title'));
     }
 
     public function view_po()
@@ -227,19 +233,19 @@ class MainController extends Controller
         $preorder = Preorder::all();
         $title = 'Total Purchase Order';
 
-        return view('das-view.preorder', compact('preorder','title'));
+        return view('das-view.preorder', compact('preorder', 'title'));
     }
 
-    public function custom_view_quotation(){
+    public function custom_view_quotation()
+    {
 
         $sph = Sph::orderBy('created_at', 'desc')->get();
         $title = 'Total Quotation';
 
-        return view('custom.quotation', compact('sph','title'));
-
+        return view('custom.quotation', compact('sph', 'title'));
     }
 
-     // Build KPI metrics for a set of users in aggregated queries
+    // Build KPI metrics for a set of users in aggregated queries
     private function buildKpiMetrics($users, $start, $end)
     {
         $ids = collect($users)->pluck('id')->all();
@@ -280,6 +286,4 @@ class MainController extends Controller
 
         return $metrics;
     }
-
 }
-

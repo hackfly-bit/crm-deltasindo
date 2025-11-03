@@ -2,57 +2,139 @@
 
 @push('plugin-styles')
     <link href="{{ asset('assets/plugins/flatpickr/flatpickr.min.css') }}" rel="stylesheet" />
+    <link href="{{ asset('assets/plugins/animate/animate.min.css') }}" rel="stylesheet" />
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 @endpush
 
 @section('content')
-    <div class="row">
+    <div class="row" x-data="profileDashboardState({
+        userId: {{ $user->id }},
+        initialYear: {{ isset($filter_start) ? $filter_start->format('Y') : now()->format('Y') }},
+        initialRange: { 
+            start: '{{ isset($filter_start) ? $filter_start->format('Y-m-d') : now()->startOfYear()->format('Y-m-d') }}', 
+            end: '{{ isset($filter_end) ? $filter_end->format('Y-m-d') : now()->endOfYear()->format('Y-m-d') }}' 
+        },
+        initialData: {
+            brandSeries: @json($brand_series ?? []),
+            productSeries: @json($product_series ?? []),
+            totalData: { 
+                customer: {{ $data_customer ?? 0 }}, 
+                call: {{ $data_call ?? 0 }}, 
+                visit: {{ $data_visit ?? 0 }}, 
+                presentasi: {{ $data_presentasi ?? 0 }}, 
+                sph: {{ $data_sph ?? 0 }}, 
+                preorder: {{ $data_po ?? 0 }}, 
+                other: {{ $data_other ?? 0 }} 
+            },
+            salesTarget: {{ $sales_target ?? 0 }},
+            kpiWeekly: @json($kpi_weekly ?? []),
+            kpiMonthly: @json($kpi_monthly ?? []),
+            user: @json($user)
+        }
+    })" x-init="init()" class="animate__animated animate__fadeIn">
         <div class="col-12 grid-margin">
             <div class="card">
                 <div class="position-relative">
-                    <div class="row p-5">
-                        <h4 class="mb-3 mb-md-0">Dashboard User</h4>
-                        <div class="d-flex align-items-center mt-2 mt-md-0">
-                            <form method="GET" action="{{ route('user.profile', $user->id) }}">
-                                <div class="row align-items-center g-3">
-                                    <div class="col-auto">
-                                        <label class="visually-hidden" for="start_date">Start Date</label>
-                                        <div class="input-group flatpickr" id="profile-start-date">
-                                            <input type="text" name="start_date" class="form-control" id="start_date"
-                                                placeholder="Start Date" data-input
-                                                value="{{ isset($filter_start) ? $filter_start->format('Y-m-d') : '' }}">
-                                            <span class="input-group-text input-group-addon" data-toggle><i
-                                                    data-feather="calendar"></i></span>
+                    <div class="row p-4 p-md-5">
+                        <div class="col-12">
+                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+                                <div>
+                                    <h4 class="mb-2 mb-md-0 fw-bold text-primary">
+                                        <i class="mdi mdi-account-box-outline me-2"></i>Dashboard User
+                                    </h4>
+                                    <p class="text-muted mb-0">Performance overview dan analisis data pengguna</p>
+                                </div>
+                                <div class="mt-3 mt-md-0">
+                                    <div class="row align-items-center g-2 g-md-3">
+                                        <div class="col-auto">
+                                            <label class="form-label fw-semibold">Tahun</label>
+                                            <select class="form-select form-select-sm shadow-sm" 
+                                                    x-model="year" 
+                                                    @change="onYearChange" 
+                                                    style="width: 120px;">
+                                                @for($y = 2020; $y <= 2030; $y++)
+                                                    <option value="{{ $y }}" 
+                                                            {{ (isset($filter_start) ? $filter_start->format('Y') : now()->format('Y')) == $y ? 'selected' : '' }}>
+                                                        {{ $y }}
+                                                    </option>
+                                                @endfor
+                                            </select>
                                         </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <label class="visually-hidden" for="end_date">End Date</label>
-                                        <div class="input-group flatpickr" id="profile-end-date">
-                                            <input type="text" name="end_date" class="form-control" id="end_date" placeholder="End Date"
-                                                data-input value="{{ isset($filter_end) ? $filter_end->format('Y-m-d') : '' }}">
-                                            <span class="input-group-text input-group-addon" data-toggle><i
-                                                    data-feather="calendar"></i></span>
+                                        <div class="col-auto">
+                                            <label class="visually-hidden" for="start_date">Tanggal Mulai</label>
+                                            <div class="input-group flatpickr shadow-sm" id="profile-start-date">
+                                                <input type="text" 
+                                                       class="form-control form-control-sm" 
+                                                       id="start_date" 
+                                                       placeholder="Tgl Mulai" 
+                                                       data-input>
+                                                <span class="input-group-text input-group-addon" data-toggle>
+                                                    <i data-feather="calendar" class="icon-sm"></i>
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="submit" class="btn btn-primary">Filter</button>
+                                        <div class="col-auto">
+                                            <label class="visually-hidden" for="end_date">Tanggal Selesai</label>
+                                            <div class="input-group flatpickr shadow-sm" id="profile-end-date">
+                                                <input type="text" 
+                                                       class="form-control form-control-sm" 
+                                                       id="end_date" 
+                                                       placeholder="Tgl Selesai" 
+                                                       data-input>
+                                                <span class="input-group-text input-group-addon" data-toggle>
+                                                    <i data-feather="calendar" class="icon-sm"></i>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="button" 
+                                                    class="btn btn-primary btn-sm px-3 shadow-sm" 
+                                                    @click="onDateRangeChange"
+                                                    :disabled="loading">
+                                                <i data-feather="filter" class="icon-sm me-1"></i>
+                                                <span x-text="loading ? 'Loading...' : 'Filter'"></span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </form>
+                            </div>
                         </div>
-                        <div class="col-6 p-2">
-                            <h5 class="mb-3 mb-md-0 text-center p-3">Brand Chart</h5>
-                            <div id="brand"></div>
-                        </div>
-                        <div class="col-6 p-2">
-                            <h5 class="mb-3 mb-md-0 text-center p-3">Produk Chart</h5>
-                            <div id="product"></div>
+                        
+                        <!-- Chart Section -->
+                        <div class="col-12 mt-4">
+                            <div class="row g-4">
+                                <div class="col-lg-6">
+                                    <div class="card border-0 shadow-sm h-100">
+                                        <div class="card-header bg-transparent border-bottom-0">
+                                            <h5 class="card-title mb-0 text-center fw-semibold text-primary">
+                                                <i class="mdi mdi-chart-bar me-2"></i>Brand Chart
+                                            </h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="brand" style="min-height: 300px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="card border-0 shadow-sm h-100">
+                                        <div class="card-header bg-transparent border-bottom-0">
+                                            <h5 class="card-title mb-0 text-center fw-semibold text-primary">
+                                                <i class="mdi mdi-chart-line me-2"></i>Produk Chart
+                                            </h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="product" style="min-height: 300px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="d-flex justify-content-between align-items-center top-90 w-100 px-2 px-md-4 mt-n4">
                         <div>
                             <img class="wd-70 rounded-circle" src="{{ asset('assets/images/profile.png') }}"
                                 alt="profile">
-                            <span class="h4 ms-3 text-dark">{{ $user->firstname }} {{ $user->lastname }}</span>
+                            <span class="h4 ms-3 text-dark" x-text="user.full_name ?? ('{{ $user->firstname }} {{ $user->lastname }}')"></span>
                         </div>
                         <div class="d-none d-md-block">
                             <button class="btn btn-primary btn-icon-text" data-bs-toggle="modal" data-bs-target="#editProfileModal">
@@ -61,9 +143,115 @@
                         </div>
                     </div>
                 </div>
-                <div class="d-flex justify-content-center p-3 rounded-bottom">
-
-                </div>
+                <div class="col-12 p-2">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-transparent border-bottom-0">
+                                    <h5 class="card-title mb-0 fw-semibold text-primary">
+                                        <i class="mdi mdi-chart-pie me-2"></i>Total Data Aktivitas
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-light h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-account-multiple text-primary" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="text-muted font-weight-normal mb-2">Customer</h5>
+                                                    <h3 class="mb-0 fw-bold text-primary" 
+                                                        x-text="data.totalData.customer ?? 0">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-light h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-phone text-success" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="text-muted font-weight-normal mb-2">Call</h5>
+                                                    <h3 class="mb-0 fw-bold text-success" 
+                                                        x-text="data.totalData.call ?? 0">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-light h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-walk text-warning" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="text-muted font-weight-normal mb-2">Visit</h5>
+                                                    <h3 class="mb-0 fw-bold text-warning" 
+                                                        x-text="data.totalData.visit ?? 0">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-light h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-presentation text-info" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="text-muted font-weight-normal mb-2">Presentasi</h5>
+                                                    <h3 class="mb-0 fw-bold text-info" 
+                                                        x-text="data.totalData.presentasi ?? 0">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-light h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-file-document-outline text-secondary" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="text-muted font-weight-normal mb-2">SPH</h5>
+                                                    <h3 class="mb-0 fw-bold text-secondary" 
+                                                        x-text="data.totalData.sph ?? 0">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-light h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-cart-outline text-danger" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="text-muted font-weight-normal mb-2">Preorder</h5>
+                                                    <h3 class="mb-0 fw-bold text-danger" 
+                                                        x-text="data.totalData.preorder ?? 0">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-light h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-dots-horizontal text-dark" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="text-muted font-weight-normal mb-2">Other</h5>
+                                                    <h3 class="mb-0 fw-bold text-dark" 
+                                                        x-text="data.totalData.other ?? 0">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 col-lg-3">
+                                            <div class="card border-0 bg-gradient-primary text-white h-100">
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-2">
+                                                        <i class="mdi mdi-chart-line" style="font-size: 2rem;"></i>
+                                                    </div>
+                                                    <h5 class="font-weight-normal mb-2">Total</h5>
+                                                    <h3 class="mb-0 fw-bold" 
+                                                        x-text="(data.totalData.customer ?? 0) + (data.totalData.call ?? 0) + (data.totalData.visit ?? 0) + (data.totalData.presentasi ?? 0) + (data.totalData.sph ?? 0) + (data.totalData.preorder ?? 0) + (data.totalData.other ?? 0)">0</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
             </div>
         </div>
     </div>
@@ -138,14 +326,30 @@
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <h6 class="card-title mb-0">About</h6>
                     </div>
-                    <p>{{ $user->about }}</p>
+                    <p x-text="user.about ?? '{{ $user->about }}'"></p>
                     <div class="mt-3">
                         <label class="tx-11 fw-bolder mb-0 text-uppercase">Alamat:</label>
-                        <p class="text-muted">{{ $user->address }}, {{ $user->city }}, {{ $user->country }}</p>
+                        <p class="text-muted"><span x-text="(user.address || '')"></span>, <span x-text="(user.city || '')"></span>, <span x-text="(user.country || '')"></span></p>
                     </div>
                     <div class="mt-3">
                         <label class="tx-11 fw-bolder mb-0 text-uppercase">Email:</label>
-                        <p class="text-muted">{{ $user->country }}</p>
+                        <p class="text-muted" x-text="user.email ?? '{{ $user->email }}'"></p>
+                    </div>
+                    <div class="mt-3">
+                        <label class="tx-11 fw-bolder mb-0 text-uppercase">Jabatan:</label>
+                        <p class="text-muted" x-text="user.role ?? '{{ $user->role }}'"></p>
+                    </div>
+                    <div class="mt-3">
+                        <label class="tx-11 fw-bolder mb-0 text-uppercase">Departemen:</label>
+                        <p class="text-muted" x-text="user.department ?? '-' "></p>
+                    </div>
+                    <div class="mt-3">
+                        <label class="tx-11 fw-bolder mb-0 text-uppercase">No HP:</label>
+                        <p class="text-muted" x-text="user.phone ?? '-' "></p>
+                    </div>
+                    <div class="mt-3">
+                        <label class="tx-11 fw-bolder mb-0 text-uppercase">Tanggal Join:</label>
+                        <p class="text-muted" x-text="user.join_date ?? '{{ optional($user->created_at)->format('Y-m-d') }}'"></p>
                     </div>
                     <div class="mt-3 d-flex social-links">
                         <a href="javascript:;" class="btn btn-icon border btn-xs me-2">
@@ -187,7 +391,7 @@
                                     </div>
                                 </div>
                                 <div class="dropdown">
-                                    <select class="form-select form-select-sm" id="weekFilter" style="width: 120px;">
+                                    <select class="form-select form-select-sm" id="weekFilter" style="width: 120px;" x-model="week" @change="onWeekChange">
                                         <option value="">Pilih Minggu</option>
                                         @for($i = 1; $i <= 52; $i++)
                                             <option value="{{ $i }}" {{ request('week') == $i ? 'selected' : '' }}>
@@ -203,56 +407,56 @@
                                 <li class="list-group-item">New Customer
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['new_customer'] / 2) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['new_customer'] / 2) * 100 }}%"
+                                            :style="{ width: kpiWeeklyPct('new_customer') + '%' }"
+                                            :aria-valuenow="kpiWeeklyPct('new_customer')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['new_customer'] / 2) * 100 }}%</div>
+                                            <span x-text="kpiWeeklyPct('new_customer') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Promotion
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['call'] / 16) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['call'] / 16) * 100 }}%"
+                                            :style="{ width: kpiWeeklyPct('call') + '%' }"
+                                            :aria-valuenow="kpiWeeklyPct('call')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['call'] / 16) * 100 }}%</div>
+                                            <span x-text="kpiWeeklyPct('call') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Visit
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['visit'] / 4) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['visit'] / 4) * 100 }}%"
+                                            :style="{ width: kpiWeeklyPct('visit') + '%' }"
+                                            :aria-valuenow="kpiWeeklyPct('visit')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['visit'] / 4) * 100 }}%</div>
+                                            <span x-text="kpiWeeklyPct('visit') + '%' "></span></div>
                                     </div>
 
                                 </li>
                                 <li class="list-group-item">Qoutation
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['sph'] / 2) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['sph'] / 2) * 100 }}%"
+                                            :style="{ width: kpiWeeklyPct('sph') + '%' }"
+                                            :aria-valuenow="kpiWeeklyPct('sph')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['sph'] / 2) * 100 }}%</div>
+                                            <span x-text="kpiWeeklyPct('sph') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Purchase Order
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['preorder'] / 1) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['preorder'] / 1) * 100 }}%"
+                                            :style="{ width: kpiWeeklyPct('preorder') + '%' }"
+                                            :aria-valuenow="kpiWeeklyPct('preorder')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['preorder'] / 1) * 100 }}%</div>
+                                            <span x-text="kpiWeeklyPct('preorder') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Presentasi
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_weekly['presentasi'] / 2) * 100 }}%;"
-                                            aria-valuenow="{{ ($kpi_weekly['presentasi'] / 2) * 100 }}%"
+                                            :style="{ width: kpiWeeklyPct('presentasi') + '%' }"
+                                            :aria-valuenow="kpiWeeklyPct('presentasi')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_weekly['presentasi'] / 2) * 100 }}%</div>
+                                            <span x-text="kpiWeeklyPct('presentasi') + '%' "></span></div>
                                     </div>
                                 </li>
                             </ul>
@@ -269,7 +473,7 @@
                                     </div>
                                 </div>
                                 <div class="dropdown">
-                                    <select class="form-select form-select-sm" id="monthFilter" style="width: 120px;">
+                                    <select class="form-select form-select-sm" id="monthFilter" style="width: 120px;" x-model="month" @change="onMonthChange">
                                         <option value="">Pilih Bulan</option>
                                         @php
                                             $months = [
@@ -292,55 +496,55 @@
                                 <li class="list-group-item">New Customer
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['new_customer']/8)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['new_customer']/8)*100 }}%"
+                                            :style="{ width: kpiMonthlyPct('new_customer') + '%' }"
+                                            :aria-valuenow="kpiMonthlyPct('new_customer')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['new_customer']/8)*100 }}%</div>
+                                            <span x-text="kpiMonthlyPct('new_customer') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Promotion
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['call']/60)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['call']/60)*100 }}%"
+                                            :style="{ width: kpiMonthlyPct('call') + '%' }"
+                                            :aria-valuenow="kpiMonthlyPct('call')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['call']/60)*100 }}%</div>
+                                            <span x-text="kpiMonthlyPct('call') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Visit
                                     <div class="progress">
                                     <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['visit']/16)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['visit']/16)*100 }}%"
+                                            :style="{ width: kpiMonthlyPct('visit') + '%' }"
+                                            :aria-valuenow="kpiMonthlyPct('visit')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['visit']/16)*100 }}%</div>
+                                            <span x-text="kpiMonthlyPct('visit') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Qoutation
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['sph']/8)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['sph']/8)*100 }}%"
+                                            :style="{ width: kpiMonthlyPct('sph') + '%' }"
+                                            :aria-valuenow="kpiMonthlyPct('sph')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['sph']/8)*100 }}%</div>
+                                            <span x-text="kpiMonthlyPct('sph') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Purchase Order
                                     <div class="progress">
                                     <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['preorder']/1)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['preorder']/1)*100 }}%"
+                                            :style="{ width: kpiMonthlyPct('preorder') + '%' }"
+                                            :aria-valuenow="kpiMonthlyPct('preorder')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['preorder']/1)*100 }}%</div>
+                                            <span x-text="kpiMonthlyPct('preorder') + '%' "></span></div>
                                     </div>
                                 </li>
                                 <li class="list-group-item">Presentasi
                                     <div class="progress">
                                         <div class="progress-bar progress-bar-striped" role="progressbar"
-                                            style="width: {{ ($kpi_monthly['presentasi']/2)*100 }}%;"
-                                            aria-valuenow="{{ ($kpi_monthly['presentasi']/2)*100 }}%"
+                                            :style="{ width: kpiMonthlyPct('presentasi') + '%' }"
+                                            :aria-valuenow="kpiMonthlyPct('presentasi')"
                                             aria-valuemin="0" aria-valuemax="100">
-                                            {{ ($kpi_monthly['presentasi']/2)*100 }}%</div>
+                                            <span x-text="kpiMonthlyPct('presentasi') + '%' "></span></div>
                                     </div>
                                 </li>
                             </ul>
@@ -390,136 +594,208 @@
 @push('plugin-scripts')
     <script src="{{ asset('assets/plugins/flatpickr/flatpickr.min.js') }}"></script>
     <script src="{{ asset('assets/plugins/apexcharts/apexcharts.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js"></script>
 @endpush
 
 @push('custom-scripts')
     <script>
-        if (typeof flatpickr !== 'undefined') {
-            flatpickr("#profile-start-date", {
-                wrap: true,
-                dateFormat: "Y-m-d",
-                altInput: true,
-                altFormat: "d M Y"
-            });
-            flatpickr("#profile-end-date", {
-                wrap: true,
-                dateFormat: "Y-m-d",
-                altInput: true,
-                altFormat: "d M Y"
-            });
-        }
+        window.profileDashboardState = function ({ userId, initialYear, initialRange, initialData }) {
+            return {
+                userId,
+                year: initialYear,
+                startDate: initialRange.start,
+                endDate: initialRange.end,
+                week: '',
+                month: '',
+                user: initialData.user || {},
+                data: {
+                    brandSeries: initialData.brandSeries || [],
+                    productSeries: initialData.productSeries || [],
+                    totalData: initialData.totalData || {},
+                    salesTarget: initialData.salesTarget || 0,
+                    kpiWeekly: initialData.kpiWeekly || {},
+                    kpiMonthly: initialData.kpiMonthly || {},
+                },
+                charts: { brand: null, product: null, total: null, sales: null },
+                pickers: { start: null, end: null },
+                apiBase: `${window.location.origin}/api/profile/${userId}`,
+                init() {
+                    if (typeof flatpickr !== 'undefined') {
+                        this.pickers.start = flatpickr('#profile-start-date', { wrap: true, dateFormat: 'Y-m-d', altInput: true, altFormat: 'd M Y', defaultDate: this.startDate });
+                        this.pickers.end = flatpickr('#profile-end-date', { wrap: true, dateFormat: 'Y-m-d', altInput: true, altFormat: 'd M Y', defaultDate: this.endDate });
+                    }
+                    this.renderBrand();
+                    this.renderProduct();
+                    this.renderTotal();
+                    this.renderSales();
+                    this.fetchUser();
+                },
+                onYearChange() {
+                    this.startDate = `${this.year}-01-01`;
+                    this.endDate = `${this.year}-12-31`;
+                    if (this.pickers.start) this.pickers.start.setDate(this.startDate, true);
+                    if (this.pickers.end) this.pickers.end.setDate(this.endDate, true);
+                    this.week = '';
+                    this.month = '';
+                    this.fetchRangeData();
+                    this.fetchKpiWeekly();
+                    this.fetchKpiMonthly();
+                    this.fetchUser();
+                },
+                onDateRangeChange() {
+                    const s = document.getElementById('start_date').value;
+                    const e = document.getElementById('end_date').value;
+                    if (s) this.startDate = s;
+                    if (e) this.endDate = e;
+                    this.fetchRangeData();
+                },
+                fetchUser() {
+                    axios.get(`${this.apiBase}/user`).then(r => {
+                        if (r.data && r.data.success) {
+                            this.user = r.data.data || {};
+                        }
+                    }).catch(err => console.error(err));
+                },
+                fetchRangeData() {
+                    const params = { filter_type: 'all', start_date: this.startDate, end_date: this.endDate };
+                    axios.get(`${this.apiBase}/brand-chart`, { params }).then(r => {
+                        if (r.data && r.data.success) {
+                            this.data.brandSeries = r.data.data || [];
+                            this.updateBrand();
+                        }
+                    });
+                    axios.get(`${this.apiBase}/product-chart`, { params }).then(r => {
+                        if (r.data && r.data.success) {
+                            this.data.productSeries = r.data.data || [];
+                            this.updateProduct();
+                        }
+                    });
+                    axios.get(`${this.apiBase}/total-data`, { params }).then(r => {
+                        if (r.data && r.data.success) {
+                            this.data.totalData = r.data.data || {};
+                            this.updateTotal();
+                        }
+                    });
+                    axios.get(`${this.apiBase}/sales-target`, { params }).then(r => {
+                        if (r.data && r.data.success) {
+                            this.data.salesTarget = (r.data.data && r.data.data.sales_target) ? r.data.data.sales_target : 0;
+                            this.updateSales();
+                        }
+                    });
+                },
+                fetchKpiWeekly() {
+                    const params = this.week ? { week: this.week, year: this.year } : { start_date: this.startDate, end_date: this.endDate };
+                    axios.get(`${this.apiBase}/kpi-weekly`, { params }).then(r => {
+                        if (r.data && r.data.success) {
+                            this.data.kpiWeekly = r.data.data || {};
+                        }
+                    });
+                },
+                fetchKpiMonthly() {
+                    const params = this.month ? { month: this.month, year: this.year } : { start_date: this.startDate, end_date: this.endDate };
+                    axios.get(`${this.apiBase}/kpi-monthly`, { params }).then(r => {
+                        if (r.data && r.data.success) {
+                            this.data.kpiMonthly = r.data.data || {};
+                        }
+                    });
+                },
+                onWeekChange() { this.fetchKpiWeekly(); },
+                onMonthChange() { this.fetchKpiMonthly(); },
+                renderBrand() {
+                    const options = {
+                        chart: { height: 400, width: '100%', type: 'bar' },
+                        plotOptions: { bar: { distributed: true, columnWidth: '60%' } },
+                        legend: { show: false },
+                        series: [{ data: this.data.brandSeries }]
+                    };
+                    this.charts.brand = new ApexCharts(document.querySelector('#brand'), options);
+                    this.charts.brand.render();
+                },
+                updateBrand() { if (this.charts.brand) this.charts.brand.updateSeries([{ data: this.data.brandSeries }]); },
+                renderProduct() {
+                    const options = {
+                        chart: { height: 400, width: '100%', type: 'bar' },
+                        plotOptions: { bar: { distributed: true, columnWidth: '60%' } },
+                        legend: { show: false },
+                        series: [{ data: this.data.productSeries }]
+                    };
+                    this.charts.product = new ApexCharts(document.querySelector('#product'), options);
+                    this.charts.product.render();
+                },
+                updateProduct() { if (this.charts.product) this.charts.product.updateSeries([{ data: this.data.productSeries }]); },
+                renderTotal() {
+                    const seriesData = [
+                        this.data.totalData.customer || 0,
+                        this.data.totalData.call || 0,
+                        this.data.totalData.visit || 0,
+                        this.data.totalData.presentasi || 0,
+                        this.data.totalData.sph || 0,
+                        this.data.totalData.preorder || 0,
+                        this.data.totalData.other || 0
+                    ];
+                    const options = {
+                        series: [{ data: seriesData }],
+                        chart: { type: 'bar', height: 350 },
+                        plotOptions: { bar: { borderRadius: 4, horizontal: true } },
+                        dataLabels: { enabled: true },
+                        xaxis: { categories: ['Customer', 'Call', 'Visit', 'Presentasi', 'Qoutation', 'PO', 'Other'] }
+                    };
+                    this.charts.total = new ApexCharts(document.querySelector('#total_data'), options);
+                    this.charts.total.render();
+                },
+                updateTotal() {
+                    const seriesData = [
+                        this.data.totalData.customer || 0,
+                        this.data.totalData.call || 0,
+                        this.data.totalData.visit || 0,
+                        this.data.totalData.presentasi || 0,
+                        this.data.totalData.sph || 0,
+                        this.data.totalData.preorder || 0,
+                        this.data.totalData.other || 0
+                    ];
+                    if (this.charts.total) this.charts.total.updateSeries([{ data: seriesData }]);
+                },
+                renderSales() {
+                    const percent = this.salesPercent();
+                    const options = {
+                        chart: { height: 350, type: 'radialBar' },
+                        series: [percent],
+                        labels: [`Rp. ${this.formatRupiah(this.data.salesTarget)}`]
+                    };
+                    this.charts.sales = new ApexCharts(document.querySelector('#sales_target'), options);
+                    this.charts.sales.render();
+                },
+                updateSales() {
+                    const percent = this.salesPercent();
+                    if (this.charts.sales) {
+                        this.charts.sales.updateSeries([percent]);
+                        this.charts.sales.updateOptions({ labels: [`Rp. ${this.formatRupiah(this.data.salesTarget)}`] });
+                    }
+                },
+                salesPercent() {
+                    const targetCap = 5000000000; // 5 M default cap
+                    const val = Number(this.data.salesTarget || 0);
+                    return Math.min(100, Math.round((val / targetCap) * 100));
+                },
+                kpiWeeklyPct(key) {
+                    const target = { new_customer: 2, call: 16, visit: 4, presentasi: 2, sph: 2, preorder: 1 }[key] || 1;
+                    const val = Number((this.data.kpiWeekly && this.data.kpiWeekly[key]) || 0);
+                    return Math.min(100, Math.round((val / target) * 100));
+                },
+                kpiMonthlyPct(key) {
+                    const target = { new_customer: 8, call: 60, visit: 16, presentasi: 4, sph: 8, preorder: 2 }[key] || 1;
+                    const val = Number((this.data.kpiMonthly && this.data.kpiMonthly[key]) || 0);
+                    return Math.min(100, Math.round((val / target) * 100));
+                },
+                formatRupiah(angka) { try { const n = Number(angka || 0); return n.toLocaleString('id-ID'); } catch { return String(angka || 0); } }
+            };
+        };
     </script>
 @endpush
 
 @push('user-chart')
-    <script>
-        const brandSeriesData = @json($brand_series ?? []);
-        const productSeriesData = @json($product_series ?? []);
-
-        const brand = {
-            chart: { height: 400, width: '100%', type: 'bar' },
-            plotOptions: { bar: { distributed: true, columnWidth: '60%' } },
-            legend: { show: false },
-            series: [{ data: brandSeriesData }]
-        };
-
-        const product = {
-            chart: { height: 400, width: '100%', type: 'bar' },
-            plotOptions: { bar: { distributed: true, columnWidth: '60%' } },
-            legend: { show: false },
-            series: [{ data: productSeriesData }]
-        };
-
-        const sales_target = {
-            chart: { height: 350, type: 'radialBar' },
-            series: [{{ ($sales_target / 5000000000) * 100 }}],
-            labels: ['Rp. {{ number_format($sales_target) }}'],
-        };
-
-        const total_data = {
-            series: [{
-                data: [{{ $data_customer }}, {{ $data_call }}, {{ $data_visit }},
-                    {{ $data_presentasi }}, {{ $data_sph }}, {{ $data_po }}, {{ $data_other }}
-                ]
-            }],
-            chart: { type: 'bar', height: 350 },
-            plotOptions: { bar: { borderRadius: 4, horizontal: true } },
-            dataLabels: { enabled: true },
-            xaxis: { categories: ['Customer', 'Call', 'Visit', 'Presentasi', 'Qoutation', 'PO', 'Other'] }
-        };
-
-        new ApexCharts(document.querySelector('#total_data'), total_data).render();
-        new ApexCharts(document.querySelector('#sales_target'), sales_target).render();
-        new ApexCharts(document.querySelector('#brand'), brand).render();
-        new ApexCharts(document.querySelector('#product'), product).render();
-    </script>
 @endpush
 
 
 @push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const brandSeriesData = @json($brand_series ?? []);
-        const productSeriesData = @json($product_series ?? []);
-
-        // Handle week filter change
-        document.getElementById('weekFilter').addEventListener('change', function() {
-            const selectedWeek = this.value;
-            const currentUrl = new URL(window.location.href);
-            
-            if (selectedWeek) {
-                currentUrl.searchParams.set('week', selectedWeek);
-            } else {
-                currentUrl.searchParams.delete('week');
-            }
-            
-            window.location.href = currentUrl.toString();
-        });
-
-        // Handle month filter change
-        document.getElementById('monthFilter').addEventListener('change', function() {
-            const selectedMonth = this.value;
-            const currentUrl = new URL(window.location.href);
-            
-            if (selectedMonth) {
-                currentUrl.searchParams.set('month', selectedMonth);
-                // Preserve year from master filter if exists
-                const startDate = document.getElementById('start_date').value;
-                if (startDate) {
-                    const year = new Date(startDate).getFullYear();
-                    currentUrl.searchParams.set('year', year);
-                }
-            } else {
-                currentUrl.searchParams.delete('month');
-                currentUrl.searchParams.delete('year');
-            }
-            
-            window.location.href = currentUrl.toString();
-        });
-
-        // Brand chart
-        if (document.querySelector('#chartBrand')) {
-            const brandChart = new ApexCharts(document.querySelector('#chartBrand'), {
-                chart: { type: 'bar', height: 300 },
-                series: [{ name: 'Brand', data: brandSeriesData }],
-                xaxis: { type: 'category' },
-                dataLabels: { enabled: false },
-                tooltip: { y: { formatter: (val) => `${val}` } }
-            });
-            brandChart.render();
-        }
-
-        // Produk chart
-        if (document.querySelector('#chartProduk')) {
-            const produkChart = new ApexCharts(document.querySelector('#chartProduk'), {
-                chart: { type: 'bar', height: 300 },
-                series: [{ name: 'Produk', data: productSeriesData }],
-                xaxis: { type: 'category' },
-                dataLabels: { enabled: false },
-                tooltip: { y: { formatter: (val) => `${val}` } }
-            });
-            produkChart.render();
-        }
-    });
-</script>
 @endpush

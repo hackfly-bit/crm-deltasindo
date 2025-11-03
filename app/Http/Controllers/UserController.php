@@ -24,12 +24,14 @@ use App\Models\Category\Principal;
 
 class UserController extends Controller
 {
-    public function register(){
+    public function register()
+    {
         $roles  = Role::all();
-        return view('setting.user.create',compact('roles'));
+        return view('setting.user.create', compact('roles'));
     }
 
-    public function register_action(Request $request){
+    public function register_action(Request $request)
+    {
 
         $request->validate([
             'role' => 'required',
@@ -59,7 +61,6 @@ class UserController extends Controller
         $user->save();
 
         return redirect()->route('setting.user')->with('success', 'Registration success. Please login!');
-
     }
 
     public function editUser($id)
@@ -67,8 +68,7 @@ class UserController extends Controller
         $user = User::find($id);
         $role = Role::all();
 
-        return view('setting.user.edit',compact('user','role'));
-
+        return view('setting.user.edit', compact('user', 'role'));
     }
 
     public function updateUser(Request $request, $id)
@@ -87,7 +87,7 @@ class UserController extends Controller
         $user->firstname = $request->firstname;
         $user->lastname = $request->lastname;
         $user->email = $request->email;
-        if($request->filled('password')){
+        if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
         }
         $user->address = $request->address;
@@ -108,12 +108,14 @@ class UserController extends Controller
         return redirect()->route('setting.user')->with('success', 'Data Berhasil Di Hapus !!');
     }
 
-    public function login(){
+    public function login()
+    {
         $data['title'] = 'Login';
         return view('auth.login');
     }
 
-    public function login_action(Request $request){
+    public function login_action(Request $request)
+    {
         $request->validate([
             'userEmail' => 'required',
             'userPassword' => 'required'
@@ -122,8 +124,8 @@ class UserController extends Controller
 
         if (Auth::attempt(['email' => $request->userEmail, 'password' => $request->userPassword])) {
             $request->session()->regenerate();
-            if(Auth::user()->role == 'sales'){
-                return redirect()->route('user.profile',Auth::user()->id)->with('success', 'Login Berhasil !!');
+            if (Auth::user()->role == 'sales') {
+                return redirect()->route('user.profile', Auth::user()->id)->with('success', 'Login Berhasil !!');
             }
             return redirect()->intended('/');
         }
@@ -160,23 +162,18 @@ class UserController extends Controller
             $end = Carbon::now()->endOfYear();
         }
 
-        // Handle week filter for KPI Weekly
-        $weekStart = $start;
-        $weekEnd = $end;
-        if ($request->filled('week')) {
-            $year = $request->filled('year') ? $request->input('year') : Carbon::now()->year;
-            $weekStart = Carbon::now()->setISODate($year, $request->input('week'))->startOfWeek();
-            $weekEnd = Carbon::now()->setISODate($year, $request->input('week'))->endOfWeek();
+        // tahun start dan end harus sama
+        if ($start->year != $end->year) {
+            return back()->withErrors([
+                'start_date' => 'Filter Start dan End harus dalam satu tahun',
+            ]);
         }
 
-        // Handle month filter for KPI Monthly
-        $monthStart = $start;
-        $monthEnd = $end;
-        if ($request->filled('month')) {
-            $year = $request->filled('year') ? $request->input('year') : Carbon::now()->year;
-            $monthStart = Carbon::create($year, $request->input('month'), 1)->startOfMonth();
-            $monthEnd = Carbon::create($year, $request->input('month'), 1)->endOfMonth();
-        }
+        $year = $start->year;
+        $weekStart = Carbon::now()->setISODate($year, $request->input('week'))->startOfWeek();
+        $weekEnd = Carbon::now()->setISODate($year, $request->input('week'))->endOfWeek();
+        $monthStart = Carbon::create($year, $request->input('month'), 1)->startOfMonth();
+        $monthEnd = Carbon::create($year, $request->input('month'), 1)->endOfMonth();
 
         if ($start->gt($end)) {
             [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
@@ -187,9 +184,9 @@ class UserController extends Controller
         // Brand Chart By Sales (refactored to use SphProduct + principal names)
         $brand_rows = SphProduct::query()
             ->whereNotNull('brand_id')
-            ->whereBetween('created_at', [$start, $end])
-            ->whereHas('sph', function ($q) use ($id) {
-                $q->where('user_id', $id);
+            ->whereHas('sph', function ($q) use ($id, $start, $end) {
+                $q->where('user_id', $id)
+                    ->whereBetween('created_at', [$start, $end]);
             })
             ->selectRaw('brand_id as brand, COUNT(*) as value')
             ->groupBy('brand_id')
@@ -209,9 +206,9 @@ class UserController extends Controller
         // Produk Chart By Sales - refactored to use SphProduct
         $rows = SphProduct::query()
             ->whereNotNull('product_id')
-            ->whereBetween('created_at', [$start, $end])
-            ->whereHas('sph', function ($q) use ($id) {
-                $q->where('user_id', $id);
+            ->whereHas('sph', function ($q) use ($id, $start, $end) {
+                $q->where('user_id', $id)
+                    ->whereBetween('created_at', [$start, $end]);
             })
             ->selectRaw('product_id, COUNT(*) as value')
             ->groupBy('product_id')
@@ -230,13 +227,27 @@ class UserController extends Controller
         }
 
         // KPI Weekly/Monthly and totals (unchanged semantics)
-        $data_customer = Customer::where('user_id', $id)->count();
-        $data_call  = Call::where('user_id', $id)->count();
-        $data_visit = Kegiatan_visit::where('user_id', $id)->count();
-        $data_other = Kegiatan_other::where('user_id', $id)->count();
-        $data_presentasi = Presentasi::where('user_id', $id)->count();
-        $data_sph =  Sph::where('user_id', $id)->count();
-        $data_po = Preorder::where('user_id', $id)->count();
+        $data_customer = Customer::where('user_id', $id)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+        $data_call  = Call::where('user_id', $id)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+        $data_visit = Kegiatan_visit::where('user_id', $id)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+        $data_other = Kegiatan_other::where('user_id', $id)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+        $data_presentasi = Presentasi::where('user_id', $id)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+        $data_sph =  Sph::where('user_id', $id)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+        $data_po = Preorder::where('user_id', $id)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
         // Customer By Sales
         $customer_by_sales = Customer::where('user_id', $id)->orderBy('id', 'asc')->take(5)->get();
 
@@ -244,22 +255,22 @@ class UserController extends Controller
         $sales_target = $user->sph()->whereBetween('created_at', [$start, $end])->sum('nilai_pagu');
 
         // KPI terstruktur: hitung berdasarkan filter yang dipilih
-        if ($request->filled('week')) {
-            $kpi_weekly = $user->kpiCountsByRange($id, $weekStart, $weekEnd);
-        } else {
-            $kpi_weekly = $user->kpiPeriodCounts('weekly');
-        }
+        // if ($request->filled('week')) {
+        $kpi_weekly = $user->kpiCountsByRange($id, $weekStart, $weekEnd);
+        // } else {
+        //     $kpi_weekly = $user->kpiPeriodCounts('weekly');
+        // }
 
-        if ($request->filled('month')) {
-            $kpi_monthly = $user->kpiCountsByRange($id, $monthStart, $monthEnd);
-        } else {
-            $kpi_monthly = $user->kpiPeriodCounts('monthly');
-        }
+        // if ($request->filled('month')) {
+        $kpi_monthly = $user->kpiCountsByRange($id, $monthStart, $monthEnd);
+        // } else {
+        //     $kpi_monthly = $user->kpiPeriodCounts('monthly');
+        // }
 
         $filter_start = $start;
         $filter_end = $end;
 
-        return view('setting.user.profile', compact('user','roles','customer_by_sales', 'data_customer','data_call','data_visit', 'data_other', 'data_presentasi','data_sph','data_po','brand_series','product_series','data_produk','filter_start','filter_end','sales_target','kpi_weekly','kpi_monthly'));
+        return view('setting.user.profileV2', compact('user', 'roles', 'customer_by_sales', 'data_customer', 'data_call', 'data_visit', 'data_other', 'data_presentasi', 'data_sph', 'data_po', 'brand_series', 'product_series', 'data_produk', 'filter_start', 'filter_end', 'sales_target', 'kpi_weekly', 'kpi_monthly'));
     }
 
     public function logout(Request $request)
