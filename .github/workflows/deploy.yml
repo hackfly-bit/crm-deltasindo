@@ -67,6 +67,7 @@ jobs:
           # git-ftp-args: --insecure
           exclude: |
             **/.git*
+            **/.github/
             **/node_modules/**
             **/tests/**
             **/.env*
@@ -81,23 +82,3 @@ jobs:
             **/sail
             **/docker-compose.yml
             **/.dockerignore
-
-      # - name: Run post-deployment commands on remote (if SSH configured)
-      #   if: ${{ secrets.SSH_HOST != '' && secrets.SSH_USERNAME != '' }}
-      #   uses: appleboy/ssh-action@v1.0.0
-      #   with:
-      #     host: ${{ secrets.SSH_HOST }}
-      #     username: ${{ secrets.SSH_USERNAME }}
-      #     password: ${{ secrets.SSH_PASSWORD }}
-      #     port: ${{ secrets.SSH_PORT || '22' }}
-      #     script: |
-      #       set -e
-      #       cd "${{ secrets.REMOTE_PATH }}"
-      #       # ensure proper permissions and caches
-      #       php artisan config:cache || true
-      #       php artisan route:cache || true
-      #       php artisan view:cache || true
-      #       php artisan migrate --force || true
-      #       php artisan storage:link || true
-      #       chmod -R 755 storage || true
-      #       chmod -R 755 bootstrap/cache || true
