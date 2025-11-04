@@ -4,6 +4,7 @@
     <link href="{{ asset('assets/plugins/datatables-net-bs5/dataTables.bootstrap5.css') }}" rel="stylesheet" />
     <link href="{{ asset('assets/plugins/flatpickr/flatpickr.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('assets/plugins/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" />
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         .loading-overlay {
             position: fixed;
@@ -96,6 +97,8 @@
         @endif
     </nav>
 
+    <div x-data="reportTable()" x-init="init()">
+
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
     </div>
@@ -107,10 +110,25 @@
                     <div class="row pb-2 align-items-center">
                         <div class="col-md-6">
                             <h6 class="card-title mb-0">Report Tabulasi</h6>
-                            <small class="text-muted">Total Data: {{ number_format($totalCustomers) }}</small>
+                            <small class="text-muted">Total Data: <span x-text="totalData"></span></small>
                         </div>
                         <div class="col-md-6">
-                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap align-items-center">
+                                <!-- Search Results Info -->
+                                <div class="text-muted small" x-show="searchQuery || salesFilter || statusFilter" style="display: none;">
+                                    <span x-text="filteredData.length"></span> hasil 
+                                    <span x-show="searchQuery">dari pencarian "<span x-text="searchQuery"></span>"</span>
+                                    <span x-show="salesFilter">dari Sales: <span x-text="salesFilter"></span></span>
+                                    <span x-show="statusFilter">dengan Status: <span x-text="statusFilter"></span></span>
+                                </div>
+                                
+                                <!-- Search Input -->
+                                <div class="input-group input-group-sm" style="max-width: 200px;">
+                                    <span class="input-group-text"><i data-feather="search"></i></span>
+                                    <input type="text" class="form-control" placeholder="Search..." 
+                                           x-model="searchQuery" @input="debouncedSearch()" id="searchInput">
+                                </div>
+
                                 <form action="{{ route('generateReport') }}" method="GET" id="reportForm"
                                     class="d-flex gap-2">
                                     <div class="row align-items-center g-2">
@@ -142,12 +160,22 @@
                                 </form>
 
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="refreshBtn">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="refreshBtn" @click="refreshData()">
                                         <i data-feather="refresh-cw" class="me-1"></i>Refresh
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="filterBtn"
                                         data-bs-toggle="modal" data-bs-target="#filterModal">
                                         <i data-feather="filter" class="me-1"></i>Filter
+                                        <span class="badge bg-primary ms-1" x-show="salesFilter || statusFilter" x-text="(salesFilter ? 1 : 0) + (statusFilter ? 1 : 0)"></span>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-warning btn-sm" @click="clearFilterState()" 
+                                            x-show="localStorage.getItem('reportFilterState')" style="display: none;"
+                                            title="Clear saved filter state">
+                                        <i data-feather="refresh-cw" class="me-1"></i>Reset Saved
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" @click="clearFilters()" 
+                                            x-show="searchQuery || salesFilter || statusFilter" style="display: none;">
+                                        <i data-feather="x" class="me-1"></i>Clear
                                     </button>
                                 </div>
                             </div>
@@ -200,110 +228,111 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($customers as $index => $customer)
-                                    @php
-                                        $call = $customer->call_data;
-                                        $visit = $customer->visit_data;
-                                        $presentasi = $customer->presentasi_data;
-                                        $sph = $customer->sph_data;
-                                        $preorder = $customer->preorder_data;
-                                        $progressValue = $progress[$customer->id] ?? 0;
-                                    @endphp
+                                <template x-if="loading">
                                     <tr>
-                                        <td>{{ ($currentPage - 1) * $perPage + $loop->iteration }}</td>
-                                        <td class="text-wrap">{{ $customer->nama_instansi }}</td>
-                                        <td>{{ $customer->nama_customer }}</td>
-                                        <td>{{ $customer->jabatan }}</td>
-                                        <td>{{ $customer->nomer_hp }}</td>
-                                        <td>{{ $customer->jenis_perusahaan }}</td>
-                                        <td>{{ $customer->segmentasi }}</td>
-                                        <td class="text-wrap">{{ $customer->alamat }}</td>
-
-                                        <td>{{ optional($call)->kegiatan }}</td>
-                                        <td>{{ optional($call)->tanggal ? \Carbon\Carbon::parse(optional($call)->tanggal)->format('d/m/Y') : '-' }}
-                                        </td>
-                                        <td>{{ optional($call)->pertemuan ? 'Call ke-' . optional($call)->pertemuan : '-' }}
-                                        </td>
-                                        <td class="text-wrap">{{ optional($call)->note }}</td>
-
-                                        <td>{{ optional($visit)->kegiatan }}</td>
-                                        <td>{{ optional($visit)->tanggal ? \Carbon\Carbon::parse(optional($visit)->tanggal)->format('d/m/Y') : '-' }}
-                                        </td>
-                                        <td>{{ optional($visit)->brand_names }}</td>
-                                        <td>{{ optional($visit)->product_names }}</td>
-                                        <td>{{ optional($visit)->pertemuan ? 'Visit ke-' . optional($visit)->pertemuan : '-' }}
-                                        </td>
-                                        <td class="text-wrap">{{ optional($visit)->note }}</td>
-
-                                        <td>{{ optional($presentasi)->kegiatan }}</td>
-                                        <td>{{ optional($presentasi)->pertemuan ? 'Presentasi ke-' . optional($presentasi)->pertemuan : '-' }}
-                                        </td>
-                                        <td>{{ optional($presentasi)->tanggal ? \Carbon\Carbon::parse(optional($presentasi)->tanggal)->format('d/m/Y') : '-' }}
-                                        </td>
-                                        <td class="text-wrap">{{ optional($presentasi)->note }}</td>
-
-                                        <td>{{ optional($sph)->kegiatan }}</td>
-                                        <td>{{ optional($sph)->brand_names }}</td>
-                                        <td>{{ optional($sph)->product_names }}</td>
-                                        <td>{{ optional($sph)->sumber_anggaran }}</td>
-                                        <td>{{ optional($sph)->nilai_pagu ? 'Rp. ' . number_format(optional($sph)->nilai_pagu) : '-' }}
-                                        </td>
-                                        <td>{{ optional($sph)->metode_pembelian }}</td>
-                                        <td>{{ optional($sph)->time_line }}</td>
-                                        <td>
-                                            @if (optional($sph)->pdf_file)
-                                                <a class="btn btn-warning btn-xs"
-                                                    href="{{ asset('assets/pdf/' . optional($sph)->pdf_file) }}"
-                                                    target="_blank" title="View File">
-                                                    <i data-feather="file-text" style="width: 14px; height: 14px;"></i>
-                                                </a>
-                                            @else
-                                                <span class="text-muted">-</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if (optional($sph)->status)
-                                                <span
-                                                    class="badge bg-{{ optional($sph)->status == 'win' ? 'success' : (optional($sph)->status == 'lose' ? 'danger' : 'warning') }}">
-                                                    {{ optional($sph)->status }}
-                                                </span>
-                                            @else
-                                                <span class="text-muted">-</span>
-                                            @endif
-                                        </td>
-                                        <td>{{ optional($sph)->winrate }}%</td>
-                                        <td class="text-wrap">{{ optional($sph)->note }}</td>
-
-                                        <td>{{ optional($preorder)->kegiatan }}</td>
-                                        <td>{{ optional($preorder)->npwp }}</td>
-                                        <td>{{ optional($preorder)->due_date ? \Carbon\Carbon::parse(optional($preorder)->due_date)->format('d/m/Y') : '-' }}
-                                        </td>
-                                        <td class="text-wrap">{{ optional($preorder)->alamat }}</td>
-
-                                        <td>{{ $customer->user->nama ?? $customer->user->username }}</td>
-
-                                        <td>
-                                            <div class="progress" style="height: 8px;"
-                                                title="Progress: {{ $progressValue }}/5 ({{ ($progressValue / 5) * 100 }}%)">
-                                                <div class="progress-bar bg-{{ $progressValue == 5 ? 'success' : ($progressValue >= 3 ? 'warning' : 'info') }}"
-                                                    role="progressbar" style="width: {{ ($progressValue / 5) * 100 }}%;"
-                                                    aria-valuenow="{{ ($progressValue / 5) * 100 }}" aria-valuemin="0"
-                                                    aria-valuemax="100">
-                                                    {{ ($progressValue / 5) * 100 }}%
-                                                </div>
+                                        <td colspan="38" class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
                                             </div>
-                                            <small class="text-muted">{{ $progressValue }}/5</small>
+                                            <p class="mt-2 text-muted">Loading data...</p>
                                         </td>
                                     </tr>
-                                @empty
+                                </template>
+                                
+                                <template x-if="!loading && filteredData.length === 0">
                                     <tr>
                                         <td colspan="38" class="text-center text-muted py-4">
                                             <i data-feather="inbox"
                                                 style="width: 48px; height: 48px; margin-bottom: 10px; opacity: 0.5;"></i>
-                                            <p>Tidak ada data yang tersedia</p>
+                                            <p x-text="searchQuery ? 'Tidak ada data yang sesuai dengan pencarian' : 'Tidak ada data yang tersedia'"></p>
                                         </td>
                                     </tr>
-                                @endforelse
+                                </template>
+                                
+                                <template x-for="(customer, index) in filteredData" :key="customer.id">
+                                    <tr>
+                                        <td x-text="(currentPage - 1) * perPage + index + 1"></td>
+                                        <td class="text-wrap" x-text="customer.nama_instansi"></td>
+                                        <td x-text="customer.nama_customer"></td>
+                                        <td x-text="customer.jabatan"></td>
+                                        <td x-text="customer.nomer_hp"></td>
+                                        <td x-text="customer.jenis_perusahaan"></td>
+                                        <td x-text="customer.segmentasi"></td>
+                                        <td class="text-wrap" x-text="customer.alamat"></td>
+
+                                        <td x-text="customer.call_data?.kegiatan || '-'"></td>
+                                        <td x-text="customer.call_data?.tanggal ? formatDate(customer.call_data.tanggal) : '-'"></td>
+                                        <td x-text="customer.call_data?.pertemuan ? 'Call ke-' + customer.call_data.pertemuan : '-'"></td>
+                                        <td class="text-wrap" x-text="customer.call_data?.note || '-'"></td>
+
+                                        <td x-text="customer.visit_data?.kegiatan || '-'"></td>
+                                        <td x-text="customer.visit_data?.tanggal ? formatDate(customer.visit_data.tanggal) : '-'"></td>
+                                        <td x-text="customer.visit_data?.brand_names || '-'"></td>
+                                        <td x-text="customer.visit_data?.product_names || '-'"></td>
+                                        <td x-text="customer.visit_data?.pertemuan ? 'Visit ke-' + customer.visit_data.pertemuan : '-'"></td>
+                                        <td class="text-wrap" x-text="customer.visit_data?.note || '-'"></td>
+
+                                        <td x-text="customer.presentasi_data?.kegiatan || '-'"></td>
+                                        <td x-text="customer.presentasi_data?.pertemuan ? 'Presentasi ke-' + customer.presentasi_data.pertemuan : '-'"></td>
+                                        <td x-text="customer.presentasi_data?.tanggal ? formatDate(customer.presentasi_data.tanggal) : '-'"></td>
+                                        <td class="text-wrap" x-text="customer.presentasi_data?.note || '-'"></td>
+
+                                        <td x-text="customer.sph_data?.kegiatan || '-'"></td>
+                                        <td x-text="customer.sph_data?.brand_names || '-'"></td>
+                                        <td x-text="customer.sph_data?.product_names || '-'"></td>
+                                        <td x-text="customer.sph_data?.sumber_anggaran || '-'"></td>
+                                        <td x-text="customer.sph_data?.nilai_pagu ? formatCurrency(customer.sph_data.nilai_pagu) : '-'"></td>
+                                        <td x-text="customer.sph_data?.metode_pembelian || '-'"></td>
+                                        <td x-text="customer.sph_data?.time_line || '-'"></td>
+                                        <td>
+                                            <template x-if="customer.sph_data?.pdf_file">
+                                                <a class="btn btn-warning btn-xs"
+                                                    :href="`/assets/pdf/${customer.sph_data.pdf_file}`"
+                                                    target="_blank" title="View File">
+                                                    <i data-feather="file-text" style="width: 14px; height: 14px;"></i>
+                                                </a>
+                                            </template>
+                                            <template x-if="!customer.sph_data?.pdf_file">
+                                                <span class="text-muted">-</span>
+                                            </template>
+                                        </td>
+                                        <td>
+                                            <template x-if="customer.sph_data?.status">
+                                                <span class="badge"
+                                                      :class="getStatusBadgeClass(customer.sph_data.status)"
+                                                      x-text="customer.sph_data.status"></span>
+                                            </template>
+                                            <template x-if="!customer.sph_data?.status">
+                                                <span class="text-muted">-</span>
+                                            </template>
+                                        </td>
+                                        <td x-text="customer.sph_data?.winrate ? customer.sph_data.winrate + '%' : '-'"></td>
+                                        <td class="text-wrap" x-text="customer.sph_data?.note || '-'"></td>
+
+                                        <td x-text="customer.preorder_data?.kegiatan || '-'"></td>
+                                        <td x-text="customer.preorder_data?.npwp || '-'"></td>
+                                        <td x-text="customer.preorder_data?.due_date ? formatDate(customer.preorder_data.due_date) : '-'"></td>
+                                        <td class="text-wrap" x-text="customer.preorder_data?.alamat || '-'"></td>
+
+                                        <td x-text="customer.user?.nama || customer.user?.username || '-'"></td>
+
+                                        <td>
+                                            <div class="progress" style="height: 8px;"
+                                                :title="`Progress: ${getProgressValue(customer)}/5 (${(getProgressValue(customer) / 5) * 100}%)`">
+                                                <div class="progress-bar" 
+                                                     :class="getProgressBarClass(getProgressValue(customer))"
+                                                     role="progressbar" 
+                                                     :style="`width: ${(getProgressValue(customer) / 5) * 100}%;`"
+                                                     :aria-valuenow="(getProgressValue(customer) / 5) * 100" 
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100"
+                                                     x-text="`${(getProgressValue(customer) / 5) * 100}%`">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted" x-text="`${getProgressValue(customer)}/5`"></small>
+                                        </td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
@@ -349,6 +378,8 @@
         </div>
     </div>
 
+    </div> <!-- Close Alpine.js wrapper -->
+
     <!-- Filter Modal -->
     <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -383,7 +414,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary btn-sm" id="applyFilter">Apply Filter</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="applyFilter" @click="applyFiltersFromModal()">Apply Filter</button>
                 </div>
             </div>
         </div>
@@ -651,6 +682,339 @@
     <script src="{{ asset('assets/js/data-table.js') }}"></script>
     <script src="{{ asset('assets/js/flatpickr.js') }}"></script>
     <script>
+        // Alpine.js Component
+        function reportTable() {
+            return {
+                // Data properties
+                customers: @json($customers),
+                totalData: '{{ number_format($totalCustomers) }}',
+                currentPage: {{ $currentPage }},
+                perPage: {{ $perPage }},
+                lastPage: {{ $lastPage }},
+                searchQuery: '',
+                loading: false,
+                // Filter properties
+                salesFilter: '',
+                statusFilter: '',
+                hasSavedFilter: false,
+                
+                // Computed properties
+                get filteredData() {
+                    let data = this.customers.data || this.customers;
+                    
+                    // Apply search filter
+                    if (this.searchQuery) {
+                        const query = this.searchQuery.toLowerCase();
+                        data = data.filter(customer => {
+                            return this.searchInCustomer(customer, query);
+                        });
+                    }
+                    
+                    // Apply sales filter
+                    if (this.salesFilter) {
+                        data = data.filter(customer => {
+                            return customer.user?.nama === this.salesFilter || 
+                                   customer.user?.username === this.salesFilter;
+                        });
+                    }
+                    
+                    // Apply status filter
+                    if (this.statusFilter) {
+                        data = data.filter(customer => {
+                            return customer.sph_data?.status === this.statusFilter;
+                        });
+                    }
+                    
+                    return data;
+                },"explanation":"Memperbarui filteredData untuk mendukung multi-filter (search, sales, status)"}
+                
+                // Methods
+                init() {
+                    console.log('Alpine.js Report Table Initialized');
+                    this.loadFilterState();
+                    this.updateTotalData();
+                    this.setupKeyboardShortcuts();
+                },
+                
+                searchInCustomer(customer, query) {
+                    // Search in main customer data
+                    if (customer.nama_instansi?.toLowerCase().includes(query) ||
+                        customer.nama_customer?.toLowerCase().includes(query) ||
+                        customer.jabatan?.toLowerCase().includes(query) ||
+                        customer.nomer_hp?.toLowerCase().includes(query) ||
+                        customer.jenis_perusahaan?.toLowerCase().includes(query) ||
+                        customer.segmentasi?.toLowerCase().includes(query) ||
+                        customer.alamat?.toLowerCase().includes(query) ||
+                        customer.user?.nama?.toLowerCase().includes(query) ||
+                        customer.user?.username?.toLowerCase().includes(query)) {
+                        return true;
+                    }
+                    
+                    // Search in related data
+                    if (customer.call_data?.kegiatan?.toLowerCase().includes(query) ||
+                        customer.call_data?.note?.toLowerCase().includes(query) ||
+                        customer.visit_data?.kegiatan?.toLowerCase().includes(query) ||
+                        customer.visit_data?.note?.toLowerCase().includes(query) ||
+                        customer.visit_data?.brand_names?.toLowerCase().includes(query) ||
+                        customer.visit_data?.product_names?.toLowerCase().includes(query) ||
+                        customer.presentasi_data?.kegiatan?.toLowerCase().includes(query) ||
+                        customer.presentasi_data?.note?.toLowerCase().includes(query) ||
+                        customer.sph_data?.kegiatan?.toLowerCase().includes(query) ||
+                        customer.sph_data?.note?.toLowerCase().includes(query) ||
+                        customer.sph_data?.brand_names?.toLowerCase().includes(query) ||
+                        customer.sph_data?.product_names?.toLowerCase().includes(query) ||
+                        customer.sph_data?.sumber_anggaran?.toLowerCase().includes(query) ||
+                        customer.sph_data?.metode_pembelian?.toLowerCase().includes(query) ||
+                        customer.sph_data?.time_line?.toLowerCase().includes(query) ||
+                        customer.sph_data?.status?.toLowerCase().includes(query) ||
+                        customer.preorder_data?.kegiatan?.toLowerCase().includes(query) ||
+                        customer.preorder_data?.npwp?.toLowerCase().includes(query) ||
+                        customer.preorder_data?.alamat?.toLowerCase().includes(query)) {
+                        return true;
+                    }
+                    
+                    return false;
+                },
+                
+                debouncedSearch() {
+                    clearTimeout(this.searchTimeout);
+                    this.searchTimeout = setTimeout(() => {
+                        this.updateTotalData();
+                        this.saveFilterState();
+                    }, 300);
+                },
+                
+                updateTotalData() {
+                    const count = this.filteredData.length;
+                    this.totalData = count.toLocaleString('id-ID');
+                },
+                
+                formatDate(dateString) {
+                    if (!dateString) return '-';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('id-ID', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                },
+                
+                formatCurrency(amount) {
+                    if (!amount) return '-';
+                    return 'Rp. ' + amount.toLocaleString('id-ID');
+                },
+                
+                getStatusBadgeClass(status) {
+                    switch (status) {
+                        case 'win': return 'bg-success';
+                        case 'lose': return 'bg-danger';
+                        default: return 'bg-warning';
+                    }
+                },
+                
+                getProgressValue(customer) {
+                    // Calculate progress based on available data
+                    let progress = 0;
+                    if (customer.call_data) progress++;
+                    if (customer.visit_data) progress++;
+                    if (customer.presentasi_data) progress++;
+                    if (customer.sph_data) progress++;
+                    if (customer.preorder_data) progress++;
+                    return progress;
+                },
+                
+                getProgressBarClass(progressValue) {
+                    if (progressValue === 5) return 'bg-success';
+                    if (progressValue >= 3) return 'bg-warning';
+                    return 'bg-info';
+                },
+                
+                refreshData() {
+                    this.loading = true;
+                    // Simulate refresh - in real implementation, you might want to fetch new data
+                    setTimeout(() => {
+                        this.loading = false;
+                        location.reload();
+                    }, 1000);
+                },
+                
+                applyFilters(filters) {
+                    // This method can be called from filter modal
+                    console.log('Applying filters:', filters);
+                    // Implement filter logic here
+                    this.updateTotalData();
+                },
+                
+                applyFiltersFromModal() {
+                    // Get filter values from modal
+                    this.salesFilter = document.getElementById('filter_sales').value;
+                    this.statusFilter = document.getElementById('filter_status').value;
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('filterModal'));
+                    modal.hide();
+                    
+                    // Update total data count
+                    this.updateTotalData();
+                    
+                    // Save filter state
+                    this.saveFilterState();
+                },
+                
+                clearFilters() {
+                    this.searchQuery = '';
+                    this.salesFilter = '';
+                    this.statusFilter = '';
+                    
+                    // Reset modal form
+                    document.getElementById('filterForm').reset();
+                    
+                    this.updateTotalData();
+                    
+                    // Save filter state
+                    this.saveFilterState();
+                },
+                
+                exportToExcel() {
+                    // Get form data
+                    const startDate = document.getElementById('start_date').value;
+                    const endDate = document.getElementById('end_date').value;
+                    
+                    if (!startDate || !endDate) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Peringatan',
+                            text: 'Mohon isi tanggal mulai dan tanggal akhir',
+                            timer: 3000
+                        });
+                        return;
+                    }
+                    
+                    // Submit form
+                    document.getElementById('reportForm').submit();
+                },
+                
+                setupKeyboardShortcuts() {
+                    // Keyboard shortcuts
+                    document.addEventListener('keydown', (e) => {
+                        // Ctrl/Cmd + F untuk fokus search
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                            e.preventDefault();
+                            document.getElementById('searchInput').focus();
+                        }
+                        
+                        // Escape untuk clear search
+                        if (e.key === 'Escape') {
+                            this.searchQuery = '';
+                            document.getElementById('searchInput').blur();
+                        }
+                        
+                        // Ctrl/Cmd + R untuk refresh
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                            e.preventDefault();
+                            this.refreshData();
+                        }
+                    });
+                },
+                
+                sortData(field, direction = 'asc') {
+                    let data = [...(this.customers.data || this.customers)];
+                    
+                    data.sort((a, b) => {
+                        let aVal = this.getNestedValue(a, field);
+                        let bVal = this.getNestedValue(b, field);
+                        
+                        if (typeof aVal === 'string') {
+                            aVal = aVal.toLowerCase();
+                            bVal = bVal.toLowerCase();
+                        }
+                        
+                        if (direction === 'asc') {
+                            return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                        } else {
+                            return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+                        }
+                    });
+                    
+                    this.customers.data = data;
+                },
+                
+                getNestedValue(obj, path) {
+                    return path.split('.').reduce((current, key) => current?.[key], obj);
+                },
+                
+                // Local Storage Methods
+                saveFilterState() {
+                    const filterState = {
+                        searchQuery: this.searchQuery,
+                        salesFilter: this.salesFilter,
+                        statusFilter: this.statusFilter,
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem('reportFilterState', JSON.stringify(filterState));
+                    this.hasSavedFilter = true;
+                    
+                    // Show notification
+                    this.showNotification('Filter state saved', 'success');
+                },
+                
+                loadFilterState() {
+                    try {
+                        const saved = localStorage.getItem('reportFilterState');
+                        if (saved) {
+                            const filterState = JSON.parse(saved);
+                            const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+                            
+                            // Only load if saved within the last hour
+                            if (Date.now() - filterState.timestamp < oneHour) {
+                                this.searchQuery = filterState.searchQuery || '';
+                                this.salesFilter = filterState.salesFilter || '';
+                                this.statusFilter = filterState.statusFilter || '';
+                                this.hasSavedFilter = true;
+                                
+                                // Update modal form values
+                                if (filterState.salesFilter) {
+                                    document.getElementById('filter_sales').value = filterState.salesFilter;
+                                }
+                                if (filterState.statusFilter) {
+                                    document.getElementById('filter_status').value = filterState.statusFilter;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to load filter state:', e);
+                    }
+                },
+                
+                clearFilterState() {
+                    localStorage.removeItem('reportFilterState');
+                    this.hasSavedFilter = false;
+                    this.showNotification('Saved filter state cleared', 'success');
+                },
+                
+                showNotification(message, type = 'info') {
+                    // Create notification element
+                    const notification = document.createElement('div');
+                    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+                    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 250px;';
+                    notification.innerHTML = `
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    
+                    // Add to body
+                    document.body.appendChild(notification);
+                    
+                    // Auto remove after 3 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 3000);
+                }
+            }
+        }
+        
         $(function() {
             'use strict';
 
