@@ -18,6 +18,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
+        // Seed roles first
+        $this->call(RoleSeeder::class);
+        
+        // Create admin user first
+        $adminUser = User::firstOrCreate([
+            'email' => 'admin@example.com'
+        ], [
+            'username' => 'admin',
+            'firstname' => 'Admin',
+            'lastname' => 'User',
+            'password' => bcrypt('password'),
+            'role' => 'admin'
+        ]);
+        
+        // Assign admin role
+        $adminUser->assignRole('admin');
         $perusahaan = array(
             array('id' => '1', 'name' => 'Pemerintah'),
             array('id' => '2', 'name' => 'Swasta')
@@ -271,15 +287,7 @@ class DatabaseSeeder extends Seeder
         );
 
 
-        $role = array(
-
-            array('name' => 'admin', 'guard_name' => 'web'),
-            array('name' => 'manager', 'guard_name' => 'web'),
-            array('name' => 'sales', 'guard_name' => 'web')
-
-
-        );
-        DB::table('roles')->insert($role);
+        // Roles sudah dibuat di RoleSeeder yang dipanggil di awal
 
         // array(
         //     array('id' => '1', 'user_id' =>  '1', 'customer_id' => '1', 'sumber_anggaran' => 'APBN', 'nilai_pagu' => '2000000', 'metode_pembelian' => 'cash', 'metode_pembayaran' => 'cash', 'time_line' =>  'Q1', 'tanggal_pengiriman' => Carbon::now(), 'tanggal_instalasi' => Carbon::now(),)

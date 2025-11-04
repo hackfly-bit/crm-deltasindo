@@ -117,21 +117,37 @@ class UserController extends Controller
     public function login_action(Request $request)
     {
         $request->validate([
-            'userEmail' => 'required',
-            'userPassword' => 'required'
-
+            'userEmail' => 'required|email',
+            'userPassword' => 'required|string|min:6'
         ]);
 
-        if (Auth::attempt(['email' => $request->userEmail, 'password' => $request->userPassword])) {
+        // Clear any existing session data
+        $request->session()->flush();
+        
+        // Attempt authentication
+        if (Auth::attempt(['email' => $request->userEmail, 'password' => $request->userPassword], true)) {
+            // Regenerate session ID for security
             $request->session()->regenerate();
+            
+            // Store user data in session
+            session(['user_id' => Auth::user()->id, 'user_role' => Auth::user()->role]);
+            
+            // Log successful login
+            \Log::info('User logged in successfully', ['user_id' => Auth::user()->id, 'email' => Auth::user()->email]);
+            
+            // Redirect based on role
             if (Auth::user()->role == 'sales') {
                 return redirect()->route('user.profile', Auth::user()->id)->with('success', 'Login Berhasil !!');
             }
-            return redirect()->intended('/');
+            
+            return redirect()->intended('/')->with('success', 'Login Berhasil !!');
         }
 
-        return back()->withErrors([
-            'password' => 'Wrong username or password',
+        // Log failed login attempt
+        \Log::warning('Failed login attempt', ['email' => $request->userEmail, 'ip' => $request->ip()]);
+        
+        return back()->withInput($request->only('userEmail'))->withErrors([
+            'userEmail' => 'Email atau password salah',
         ]);
     }
 
@@ -275,9 +291,23 @@ class UserController extends Controller
 
     public function logout(Request $request)
     {
+        // Log logout event
+        if (Auth::check()) {
+            \Log::info('User logged out', ['user_id' => Auth::user()->id, 'email' => Auth::user()->email]);
+        }
+        
+        // Clear session data
+        $request->session()->flush();
+        
+        // Logout user
         Auth::logout();
+        
+        // Invalidate session
         $request->session()->invalidate();
+        
+        // Regenerate CSRF token
         $request->session()->regenerateToken();
-        return redirect('/login');
+        
+        return redirect('/login')->with('success', 'Anda berhasil logout');
     }
 }

@@ -25,6 +25,14 @@ class MainController extends Controller
 {
     public function index(Request $request)
     {
+        // Check user role and redirect accordingly
+        $user = auth()->user();
+        
+        // If user is sales, redirect to their profile/dashboard
+        if ($user->role === 'sales') {
+            return redirect()->route('user.profile', $user->id);
+        }
+        
         // Validate optional date inputs (Y-m-d)
         $validator = Validator::make($request->all(), [
             'start_date' => 'nullable|date_format:Y-m-d',
@@ -66,26 +74,24 @@ class MainController extends Controller
         $g = Preorder::whereBetween('created_at', [$start, $end])->count();
         $h = Presentasi::whereBetween('created_at', [$start, $end])->count();
 
+        // SPH by sales - without cache
+        $sph_by_sales = DB::table('sphs')
+            ->select('user_id')
+            ->selectRaw('SUM(nilai_pagu) as total')
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy('user_id')
+            ->get()
+            ->pluck('total', 'user_id');
 
-        $sph_by_sales = Cache::remember('dashboard.sph_by_sales.' . $dateKey, 600, function () use ($start, $end) {
-            return DB::table('sphs')
-                ->select('user_id')
-                ->selectRaw('SUM(nilai_pagu) as total')
-                ->whereBetween('created_at', [$start, $end])
-                ->groupBy('user_id')
-                ->get()
-                ->pluck('total', 'user_id');
-        });
-        $count_customer_by_sales = Cache::remember('dashboard.count_customer_by_sales.' . $dateKey, 600, function () use ($start, $end) {
-            return DB::table('users')
-                ->join('customers', 'users.id', '=', 'customers.user_id')
-                ->selectRaw('username, COUNT(customers.id) as total, customers.created_at as date')
-                ->whereBetween('customers.created_at', [$start, $end])
-                ->groupBy(DB::raw('customers.created_at'))
-                ->get();
-        });
+        // Count customer by sales - without cache
+        $count_customer_by_sales = DB::table('users')
+            ->join('customers', 'users.id', '=', 'customers.user_id')
+            ->selectRaw('username, COUNT(customers.id) as total, customers.created_at as date')
+            ->whereBetween('customers.created_at', [$start, $end])
+            ->groupBy(DB::raw('customers.created_at'))
+            ->get();
 
-        $data_brand =  SphProduct::query()
+        $data_brand = SphProduct::query()
             ->whereNotNull('brand_id')
             ->whereHas('sph', function ($q) use ($start, $end) {
                 $q->whereBetween('created_at', [$start, $end]);
@@ -95,60 +101,47 @@ class MainController extends Controller
             ->orderBy('brand_id', 'asc')
             ->get();
 
-
-        $chart_by_sales = Cache::remember('dashboard.chart_by_sales.' . $dateKey, 600, function () use ($start, $end) {
-            return DB::table('users')
-                ->join('preorders', 'users.id', '=', 'preorders.user_id')
-                ->selectRaw('username, SUM(preorders.nominal) as total')
-                ->whereIn('role', ['sales', 'supervisor'])
-                ->whereBetween('preorders.created_at', [$start, $end])
-                ->groupBy('username')
-                ->get();
-        });
+        // Chart by sales - without cache
+        $chart_by_sales = DB::table('users')
+            ->join('preorders', 'users.id', '=', 'preorders.user_id')
+            ->selectRaw('username, SUM(preorders.nominal) as total')
+            ->whereIn('role', ['sales', 'supervisor'])
+            ->whereBetween('preorders.created_at', [$start, $end])
+            ->groupBy('username')
+            ->get();
 
         // date labels based on selected range
-
         $date_label = [];
         $period = CarbonPeriod::create($start, $end);
         foreach ($period as $key => $value) {
             $date_label[$key] = $value->format('d-m-Y');
         }
 
+        // product Chart - without cache
+        $rows = SphProduct::query()
+            ->whereNotNull('product_id')
+            ->whereHas('sph', function ($q) use ($start, $end) {
+                $q->whereBetween('created_at', [$start, $end]);
+            })
+            ->selectRaw('product_id, COUNT(*) as value')
+            ->groupBy('product_id')
+            ->get();
 
-        // product Chart (optimized + cached)
-        $produk_chart = Cache::remember('dashboard.produk_chart.' . $dateKey, 600, function () use ($start, $end) {
-            $rows = SphProduct::query()
-                ->whereNotNull('product_id')
-                ->whereHas('sph', function ($q) use ($start, $end) {
-                    $q->whereBetween('created_at', [$start, $end]);
-                })
-                ->selectRaw('product_id, COUNT(*) as value')
-                ->groupBy('product_id')
-                ->get();
+        $productNames = Product::query()
+            ->whereIn('id', $rows->pluck('product_id')->all())
+            ->pluck('nama_produk', 'id');
 
-            $productNames = Product::query()
-                ->whereIn('id', $rows->pluck('product_id')->all())
-                ->pluck('nama_produk', 'id');
-
-            $chart = [];
-            foreach ($rows as $row) {
-                $name = $productNames[$row->product_id] ?? (string) $row->product_id;
-                $chart[$name] = (int) $row->value;
-            }
-            return $chart;
-        });
-
-
-        // return $produkArray;
-
+        $produk_chart = [];
+        foreach ($rows as $row) {
+            $name = $productNames[$row->product_id] ?? (string) $row->product_id;
+            $produk_chart[$name] = (int) $row->value;
+        }
 
         $count_sales = Customer::where('user_id', 1)->whereBetween('created_at', [$start, $end])->get();
 
-        // Precompute KPI metrics for users to avoid N+1 queries in Blade
-        $kpi = Cache::remember('dashboard.kpi_metrics.' . $dateKey, 300, function () use ($e, $start, $end) {
-            $ids = collect($e)->pluck('id')->all();
-            return User::kpiCountsByDateRange($ids, $start, $end);
-        });
+        // KPI metrics - without cache
+        $ids = collect($e)->pluck('id')->all();
+        $kpi = User::kpiCountsByDateRange($ids, $start, $end);
 
         $filter_start = $start;
         $filter_end = $end;
