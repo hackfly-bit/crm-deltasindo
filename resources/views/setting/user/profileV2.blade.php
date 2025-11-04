@@ -223,7 +223,7 @@
                                             :disabled="loading">
                                         <option value="">Pilih Minggu</option>
                                         <template x-for="i in 52" :key="i">
-                                            <option :value="i" x-text="`Minggu ${i}`"></option>
+                                            <option :value="i" x-text="`Minggu ${i}`" :selected="i == {{ request('week') ?: date('W') }}"></option>
                                         </template>
                                     </select>
                                 </div>
@@ -337,7 +337,7 @@
                                             ];
                                         @endphp
                                         @foreach($months as $num => $name)
-                                            <option value="{{ $num }}" {{ request('month') == $num ? 'selected' : '' }}>
+                                            <option value="{{ $num }}" {{ (request('month') ?: date('n')) == $num ? 'selected' : '' }}>
                                                 {{ $name }}
                                             </option>
                                         @endforeach
@@ -469,7 +469,7 @@
         // Alpine.js component for KPI Weekly
         function kpiMonthlyComponent() {
             return {
-                selectedMonth: '{{ request("month") }}',
+                selectedMonth: '{{ request("month") ?: date("n") }}',
                 loading: false,
                 dateRange: '',
                 kpiData: {
@@ -482,11 +482,9 @@
                 },
 
                 init() {
-                    // Set initial month if available
-                    if (this.selectedMonth) {
-                        this.updateDateRange();
-                        this.fetchKpiData();
-                    }
+                    // Always set initial month and fetch data since we have default value
+                    this.updateDateRange();
+                    this.fetchKpiData();
                 },
 
                 async fetchKpiData() {
@@ -576,16 +574,16 @@
                         // Get year from start_date input or use current year as fallback
                         const startDateInput = document.getElementById('start_date');
                         let year = {{ date('Y') }}; // fallback to current year
-                        
+
                         if (startDateInput && startDateInput.value) {
                             const startDate = new Date(startDateInput.value);
                             year = startDate.getFullYear();
                         }
-                        
+
                         // Calculate date range for selected month
                         const firstDay = new Date(year, this.selectedMonth - 1, 1);
                         const lastDay = new Date(year, this.selectedMonth, 0);
-                        
+
                         this.dateRange = `${firstDay.toLocaleDateString('id-ID')} - ${lastDay.toLocaleDateString('id-ID')}`;
                     }
                 }
@@ -595,7 +593,7 @@
 
         function kpiWeeklyComponent() {
             return {
-                selectedWeek: '{{ request("week") }}',
+                selectedWeek: '{{ request("week") ?: date("W") }}',
                 loading: false,
                 dateRange: '',
                 kpiData: {
@@ -608,10 +606,9 @@
                 },
 
                 init() {
-                    // Set initial date range if week is selected
-                    if (this.selectedWeek) {
-                        this.updateDateRange();
-                    }
+                    // Always set initial date range and fetch data since we have default value
+                    this.updateDateRange();
+                    this.fetchKpiData();
                 },
 
                 async fetchKpiData() {
@@ -733,7 +730,7 @@
 
         const sales_target = {
             chart: { height: 350, type: 'radialBar' },
-            series: [{{ ($sales_target / 5000000000) * 100 }}],
+            series: [{{ number_format(($sales_target / 5000000000) * 100, 2) }}],
             labels: ['Rp. {{ number_format($sales_target) }}'],
         };
 

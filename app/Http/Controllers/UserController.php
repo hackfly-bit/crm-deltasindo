@@ -252,7 +252,7 @@ class UserController extends Controller
         $customer_by_sales = Customer::where('user_id', $id)->orderBy('id', 'asc')->take(5)->get();
 
         // Sales target filtered by date range
-        $sales_target = $user->sph()->whereBetween('created_at', [$start, $end])->sum('nilai_pagu');
+        $sales_target = $user->preorder()->whereBetween('created_at', [$start, $end])->sum('nominal');
 
         // KPI terstruktur: hitung berdasarkan filter yang dipilih
         // if ($request->filled('week')) {
